@@ -17,7 +17,7 @@ derives z-order, input blocking and mouse mode from one place; a settings panel
 generated from any `DotConfig`; a rebinder with conflict detection; and data-driven
 HUD widgets.
 
-Part of the [dot-*](../NOTES.md) family. Needs **dot-core** and nothing else.
+Part of the [dot-*](https://github.com/modcommunity) family. Needs **dot-core** and nothing else.
 
 ## Install
 

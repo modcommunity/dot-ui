@@ -14,3 +14,6 @@ export_presets.cfg
 # OS
 .DS_Store
 Thumbs.db
+
+# Rendered by tools/screenshot.sh, for looking at rather than for keeping.
+/screenshots/

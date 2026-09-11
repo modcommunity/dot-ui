@@ -72,7 +72,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
-## Called with the current spread in degrees, from `DotWeaponState.spread_degrees()`.
+## Called with the current spread in degrees, from `DotWeaponBallistics.spread_for()`.
 ##
 ## The widget's [member DotHudWidget.source] returns it, so a game binds one callable
 ## and nothing else.

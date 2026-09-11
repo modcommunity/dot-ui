@@ -99,6 +99,7 @@ func _run() -> void:
 	_test_settings_panel()
 	_test_settings_apply()
 	_test_bindings()
+	await _test_settings_screen()
 
 	DotPaths.remove_tree(BINDINGS_FILE)
 
@@ -712,6 +713,65 @@ func _test_table() -> void:
 
 # --- Settings --------------------------------------------------------------
 
+	# EVERY COLUMN GETS ROOM, which is what a rendered frame of a scoreboard found.
+	#
+	# An absent `width` used to mean `SIZE_FILL`, which reads as "take your content's
+	# width" and is not: `clip_text` sets a Label's minimum size to ZERO, so a column with
+	# no width collapsed to nothing. `scoreboard_columns()` gives a width only to `name`,
+	# so every scoreboard and every server browser in this family drew ONE column -- no
+	# kills, no deaths, no score, no ping -- with the data correct and `describe()`
+	# agreeing. Armed by putting the `0.0` default back: this check fails, and nothing
+	# about rows, columns or values does.
+	var widths := DotTableView.new()
+	add_child(widths)
+	widths.set_columns(DotTableView.scoreboard_columns())
+	widths.set_rows([{&"name": "somebody", &"kills": 3, &"deaths": 1, &"assists": 0,
+		&"score": 3, &"ping": 40}])
+
+	# A GridContainer, so the header is the first N children of the grid rather than a row
+	# node of its own. Counted over that first row only: the data rows are built by the
+	# same call and would double every number.
+	# A VBox of HBoxes, so the header is the first row and its cells are that row's
+	# children. It is an HBox rather than a `GridContainer` because a GridContainer gives
+	# every column the SAME width whatever ratio a cell asks for -- see `_ensure_grid`.
+	var grid := widths.get_node_or_null("Grid") as VBoxContainer
+	var wanted := DotTableView.scoreboard_columns().size()
+	var expanding := 0
+	var ratios := PackedFloat32Array()
+
+	if grid != null and grid.get_child_count() > 0:
+		for cell in grid.get_child(0).get_children():
+			var label := cell as Control
+			if label == null:
+				continue
+			ratios.append(label.size_flags_stretch_ratio)
+			if label.size_flags_horizontal == Control.SIZE_EXPAND_FILL:
+				expanding += 1
+
+	_check(
+		expanding == wanted,
+		"every scoreboard column asks for room (%d of %d)" % [expanding, wanted],
+		"a column with no width used to collapse to nothing, so only Player was drawn"
+	)
+
+	# AND THE RATIOS ARE HONOURED, which they were not for the life of this class.
+	#
+	# `size_flags_stretch_ratio` is read by a `BoxContainer` and by nothing else, so the
+	# `GridContainer` this used to be gave every column the same width — `width` was
+	# documented, set to 3.0 for the name column in `scoreboard_columns()`, and inert.
+	# Measured before the fix: ratios 0.4, 3.0, 1.0, 1.0 came out 308 pixels each.
+	_check(
+		ratios.size() == wanted and is_equal_approx(ratios[0], 3.0),
+		"and the name column asks for three times the share (%s)" % [ratios]
+	)
+	_check(
+		grid.get_child(0) is HBoxContainer,
+		"because a row is a BoxContainer, which is the only thing that reads a ratio"
+	)
+
+	widths.queue_free()
+
+
 func _test_settings_panel() -> void:
 	_group("settings panel")
 
@@ -828,6 +888,230 @@ func _test_settings_apply() -> void:
 
 
 # --- Bindings --------------------------------------------------------------
+
+## A source that is not a DotConfig: `to_config()` out, `absorb_config()` back.
+##
+## Deliberately NOT a `DotSettingsManager`. dot-ui depends on dot-core and nothing else,
+## and a suite that could only test this against the real thing would be a suite proving
+## the dependency rather than the seam. A plain `RefCounted` with two methods is the whole
+## contract, and that this passes is what says so.
+class FakeSettingsSource:
+	extends RefCounted
+
+	var stored: Dictionary = {"port": 111, "hostname": "before"}
+	var absorbed := 0
+
+	func to_config() -> DotConfig:
+		var cfg := TestConfig.new()
+		cfg.port = int(stored["port"])
+		cfg.hostname = str(stored["hostname"])
+		return cfg
+
+	func absorb_config(cfg: DotConfig) -> PackedStringArray:
+		absorbed += 1
+		var changed := PackedStringArray()
+		var typed := cfg as TestConfig
+		if typed.port != int(stored["port"]):
+			stored["port"] = typed.port
+			changed.append("port")
+		if typed.hostname != str(stored["hostname"]):
+			stored["hostname"] = typed.hostname
+			changed.append("hostname")
+		return changed
+
+
+func _test_settings_screen() -> void:
+	_group("settings screen")
+
+	var stack := DotScreenStack.new()
+	stack.register_service = false
+	stack.manage_mouse = false
+	add_child(stack)
+	stack.setup()
+
+	# A bare DotConfig first: the screen has to work without dot-settings existing at all,
+	# which is the case every project that has dot-ui and not dot-settings is in.
+	var direct := TestConfig.new()
+	var plain := DotSettingsScreen.new()
+	plain.name = "PlainSettings"
+	_check(plain.build(direct).ok, "a screen builds straight onto a DotConfig")
+	stack.register(plain)
+	stack.push(&"settings")
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# The one thing an assertion reaches about a Control, and this family has shipped a
+	# 0 x 0 one twice.
+	_check(plain.size.x > 0.0 and plain.size.y > 0.0, "and it has a size")
+	var body := plain.get_node_or_null("Panel") as Control
+	_check(body != null and body.size.y > 0.0, "and so does the panel inside it")
+	_check(
+		plain.get_node_or_null(plain.initial_focus) != null,
+		"with a focus path that resolves, which get_path() before the tree does not"
+	)
+
+	# THE CHECK A PICTURE HAD TO FIND FIRST.
+	#
+	# A `DotSettingsPanel` is as tall as the document it was handed, and `DotUiConfig` alone
+	# comes out around 600 pixels. Without a scroll container the column grew past the panel
+	# and past the bottom of the SCREEN, taking Apply, Revert and Back with it -- a settings
+	# screen a player can read and cannot save from or leave. Every assertion passed: the
+	# screen had a size, the panel had a size, the editors existed, and Apply worked when
+	# called in code.
+	# A STRUCTURAL CHECK, DELIBERATELY, because the behavioural ones cannot fail here.
+	#
+	# The bug was the panel growing past the bottom of the window and taking Apply, Revert
+	# and Back with it — a settings screen a player can read and cannot save from. Three
+	# assertions were tried against it and all three passed with the bug in place:
+	#
+	#   "Apply is inside the panel"   — a PanelContainer GROWS to fit, so the button stays
+	#                                   inside a panel that has itself left the window.
+	#   "Apply is inside the screen"  — a headless viewport is 64 x 64, so every screen in
+	#                                   this suite is 64 x 64 and nothing measured against
+	#                                   one means anything. `plain.size.y > 0` passes at 64
+	#                                   as happily as at 800.
+	#   "a long and a short document  — at 64 x 64 the layout resolves the same either way.
+	#    make the same-sized panel"
+	#
+	# Each was armed by replacing the ScrollContainer with a plain box and re-running; none
+	# fired. So the guard is the structure plus the reason, and the actual guard is
+	# `tools/screenshot.sh`. A check that reports its healthy case while blind is the shape
+	# this family stopped reading `tools/check.sh` over, and shipping one here would have
+	# been worse than shipping none.
+	var apply_button := plain.get_node_or_null("Panel/Column/Buttons/Apply") as Control
+	_check(apply_button != null, "the panel has an Apply button")
+
+	_check(
+		plain.get_node_or_null("Panel/Column/Scroll") is ScrollContainer,
+		"and the rows are in a scroll container",
+		"a DotSettingsPanel is as tall as the document it was handed; without this the "
+		+ "column grows past the panel and past the bottom of the window, taking Apply, "
+		+ "Revert and Back with it"
+	)
+	_check(
+		panel_parent_of(plain) is ScrollContainer,
+		"with the panel inside it and the buttons outside, so they stay reachable"
+	)
+
+	plain.panel._edited("port", 4242)
+	plain.apply()
+	_check(
+		direct.port == 4242,
+		"Apply writes straight through when the source IS the config (%d)" % direct.port
+	)
+	stack.pop()
+
+	# And the two-step, which is the reason this screen exists. `to_config()` hands out a
+	# SNAPSHOT: a screen that called only `panel.apply()` would report success and change
+	# nothing, for ever, and every check above would still pass.
+	var source := FakeSettingsSource.new()
+	var screen := DotSettingsScreen.new()
+	screen.name = "SourceSettings"
+	# Its own id, because the stack registers by id and `plain` already holds the default.
+	# A second screen under one name is refused or silently replaces the first, and the
+	# menu button then opens the wrong document -- which is what this test did first.
+	screen.id_override = &"player_settings"
+	_check(screen.build(source).ok, "a screen builds onto a source that is not a config")
+	_check(
+		stack.register(screen).ok,
+		"and registers beside the other one rather than replacing it"
+	)
+
+	var announced: Array[PackedStringArray] = []
+	screen.applied.connect(func(keys: PackedStringArray) -> void: announced.append(keys))
+
+	stack.push(&"player_settings")
+	await get_tree().process_frame
+
+	screen.panel._edited("port", 9001)
+	screen.apply()
+	_check(source.absorbed == 1, "Apply hands the snapshot back to the source")
+	_check(
+		int(source.stored["port"]) == 9001,
+		"and the source has the new value (%s)" % source.stored["port"]
+	)
+	_check(
+		announced.size() == 1 and Array(announced[0]) == ["port"],
+		"announcing which keys changed, rather than that something did"
+	)
+
+	# Opened twice. The snapshot is taken at bind time, so a screen that did not re-read
+	# would show whatever was true when it was built -- and Apply would put it back.
+	stack.pop()
+	source.stored["port"] = 7
+
+	stack.push(&"player_settings")
+	await get_tree().process_frame
+	_check(
+		(screen.config as TestConfig).port == 7,
+		"re-opening re-reads the source rather than showing a stale snapshot (%d)"
+			% (screen.config as TestConfig).port
+	)
+
+	var orphan := DotSettingsScreen.new()
+	_check(not orphan.build(null).ok, "a screen with nothing to edit is refused")
+	orphan.free()
+
+	# The pause menu beside it, for the same reason: four games wrote the same forty lines.
+	var pause := DotPauseScreen.new()
+	pause.name = "Pause"
+	_check(
+		pause.build(PackedStringArray(["Resume", "Rock the vote", "Leave"])).ok,
+		"a pause menu builds from a list of labels"
+	)
+	_check(
+		Array(pause.ids()) == [&"resume", &"rock_the_vote", &"leave"],
+		"whose ids are DERIVED from the labels, so two lists cannot disagree (%s)"
+			% [pause.ids()]
+	)
+	_check(stack.register(pause).ok, "and registers")
+	stack.push(&"pause")
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# THAT THE PUSH LANDED, which nothing asserted and a rendered frame is what found.
+	#
+	# `DotScreen`'s default id is the NODE NAME, so a screen called `Pause` registered as
+	# `&"Pause"` and `push(&"pause")` answered "no such screen" -- reported, not fatal, so
+	# the menu simply never opened. Every check below this line passed anyway: a registered
+	# screen is sized and focusable whether or not it is on screen. A test that asserts
+	# only the things that are true either way is a test that passes for the wrong reason.
+	_check(stack.top_id() == &"pause", "and OPENS, rather than registering under its node name")
+	_check(pause.visible, "so the screen is actually visible")
+
+	_check(pause.size.x > 0.0 and pause.size.y > 0.0, "and it has a size")
+	_check(
+		pause.get_node_or_null(pause.initial_focus) != null,
+		"with a focus path that resolves to the first button"
+	)
+
+	var pressed: Array[StringName] = []
+	pause.chosen.connect(func(id: StringName) -> void: pressed.append(id))
+	pause.button(&"rock_the_vote").pressed.emit()
+	_check(
+		pressed == [&"rock_the_vote"],
+		"pressing one announces which, rather than which index"
+	)
+	_check(pause.button(&"nothing_like_this") == null, "and a button nobody made is null")
+
+	var empty := DotPauseScreen.new()
+	_check(
+		not empty.build(PackedStringArray()).ok,
+		"a pause menu with no buttons is refused, because it could not be left"
+	)
+	empty.free()
+
+	stack.clear()
+	stack.queue_free()
+
+
+## The node a settings screen's panel is parented to.
+##
+## A helper rather than a path, so the check reads as "the panel is inside a scroll" rather
+## than as a string that silently stops matching when the tree changes shape.
+func panel_parent_of(screen: DotSettingsScreen) -> Node:
+	return screen.panel.get_parent() if screen.panel != null else null
+
 
 func _test_bindings() -> void:
 	_group("bindings")
@@ -946,3 +1230,51 @@ func _test_bindings() -> void:
 
 	for action in [&"test_fire", &"test_jump", &"test_use"]:
 		InputMap.erase_action(action)
+
+	# SORTED AS STRINGS, AND THE LABEL DROPS THE PREFIX.
+	#
+	# `Array.sort()` on a `StringName` compares interned POINTERS, so this method's own
+	# "sorted" was whatever order the names happened to be created in -- and unstable
+	# between builds, since it depends on which script interned each name first. It is the
+	# same trap that gave two peers two different wire ids for one message type in dot-net.
+	# A rendered frame of game-arena's rebinder is what showed it; nothing about the
+	# CONTENTS of the array could.
+	InputMap.add_action("probe_zulu")
+	InputMap.add_action("probe_alpha")
+	InputMap.add_action("probe_mike")
+
+	var sorted_panel := DotBindingsPanel.new()
+	sorted_panel.prefix = "probe_"
+	add_child(sorted_panel)
+	sorted_panel.build()
+
+	var listed := PackedStringArray()
+	for action in sorted_panel.rebindable_actions():
+		listed.append(String(action))
+
+	_check(
+		Array(listed) == ["probe_alpha", "probe_mike", "probe_zulu"],
+		"rebindable actions come out in alphabetical order (%s)" % [listed],
+		"Array.sort() on a StringName compares interned pointers, not text"
+	)
+
+	# One HBox per action, named `Row_<action>`, with the label as its first child.
+	var label_texts := PackedStringArray()
+
+	for child in sorted_panel.get_children():
+		var row := child as Control
+		if row == null:
+			continue
+		var l := row.get_child(0) as Label if row.get_child_count() > 0 else null
+		if l != null:
+			label_texts.append(l.text)
+
+	_check(
+		Array(label_texts).has("Alpha") and not Array(label_texts).has("Probe Alpha"),
+		"and the label drops the prefix, which is the part that is not information (%s)"
+			% [label_texts]
+	)
+
+	sorted_panel.queue_free()
+	for name_str in ["probe_zulu", "probe_alpha", "probe_mike"]:
+		InputMap.erase_action(name_str)

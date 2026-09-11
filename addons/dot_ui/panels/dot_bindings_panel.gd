@@ -100,7 +100,15 @@ func build() -> DotResult:
 		row.name = "Row_%s" % action
 
 		var label := Label.new()
-		label.text = String(action).replace("_", " ").capitalize()
+		# The prefix is stripped, because it is exactly the part that is not information.
+		# A player reading "Dot Fps Noclip" is being shown which addon implements their
+		# movement; what they came for is "Noclip".
+		var shown := String(action)
+
+		if prefix != "" and shown.begins_with(prefix):
+			shown = shown.substr(prefix.length())
+
+		label.text = shown.replace("_", " ").capitalize()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.tooltip_text = String(action)
 		row.add_child(label)
@@ -137,7 +145,27 @@ func rebindable_actions() -> Array[StringName]:
 
 		out.append(action)
 
-	out.sort()
+	# SORTED AS STRINGS, because `Array.sort()` on a `StringName` compares interned
+	# POINTERS -- whatever order the names happened to be created in. This method's own
+	# documentation said "sorted" and it was not: a rebinder listed Noclip, Walk, Sprint,
+	# Crouch, Jump, Back, Forward, Right, Left, which is not an order anybody can learn and
+	# is not stable between builds either, since it depends on which script interned each
+	# name first.
+	#
+	# It is the same trap that gave two peers two different wire ids for one message type
+	# in dot-net, and the only reason it is cosmetic here is that nothing downstream keys
+	# on the position. A rendered frame is what showed it; no assertion about the CONTENTS
+	# of this array could.
+	var as_strings := PackedStringArray()
+
+	for action in out:
+		as_strings.append(String(action))
+
+	as_strings.sort()
+	out.clear()
+
+	for name_str in as_strings:
+		out.append(StringName(name_str))
 	return out
 
 

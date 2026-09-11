@@ -42,12 +42,14 @@ signal row_activated(index: int, row: Dictionary)
 
 ## `[{"key": StringName, "title": String, "width": float, "align": int}, ...]`.
 ##
-## `width` is a size flag ratio, not pixels: a column of names should take the slack
+## `width` is a size flag ratio, not pixels: a column of names should take the slack, and a
+## column that omits one gets an equal share. Zero means "shrink to the content" and is the
+## only value that does not expand — spell it when you mean it.
 ## and a column of numbers should not.
 var columns: Array[Dictionary] = []
 
 var _rows: Array[Dictionary] = []
-var _grid: GridContainer = null
+var _grid: VBoxContainer = null
 
 
 func _ready() -> void:
@@ -56,14 +58,24 @@ func _ready() -> void:
 	_ensure_grid()
 
 
+## The rows container. A VBox of HBoxes, not a [GridContainer].
+##
+## [b]A `GridContainer` gives every column the same width, whatever ratio a cell asks
+## for.[/b] `size_flags_stretch_ratio` is honoured by a [BoxContainer] and by nothing else,
+## so `width` — documented here since this class was written, and set to 3.0 for the name
+## column in `scoreboard_columns()` — did nothing at all, in every table, in every game.
+## Measured: four columns with ratios 0.4, 3.0, 1.0 and 1.0 came out 308 pixels each.
+##
+## A row per `HBoxContainer` honours the ratios, and the columns still line up ACROSS rows
+## because every row is built from the same ratio list at the same width. It is kept as
+## `Grid` by name so a host or a check that found it by path still does.
 func _ensure_grid() -> void:
 	if _grid != null and is_instance_valid(_grid):
 		return
 
-	_grid = GridContainer.new()
+	_grid = VBoxContainer.new()
 	_grid.name = "Grid"
 	_grid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_grid.add_theme_constant_override("h_separation", int(column_gap))
 	add_child(_grid)
 
 
@@ -71,7 +83,6 @@ func _ensure_grid() -> void:
 func set_columns(p_columns: Array[Dictionary]) -> void:
 	columns = p_columns
 	_ensure_grid()
-	_grid.columns = maxi(1, columns.size())
 	_rebuild()
 
 
@@ -110,10 +121,14 @@ func _rebuild() -> void:
 		return
 
 	if show_header:
+		var header := _make_row()
+
 		for column in columns:
-			_grid.add_child(
+			header.add_child(
 				_make_cell(str(column.get("title", "")), header_colour, column)
 			)
+
+		_grid.add_child(header)
 
 	for index in range(visible_row_count()):
 		var row: Dictionary = _rows[index]
@@ -122,9 +137,19 @@ func _rebuild() -> void:
 		if bool(row.get("highlight", false)):
 			colour = highlight_colour
 
+		var line := _make_row()
+
 		for column in columns:
 			var key := StringName(str(column.get("key", "")))
-			_grid.add_child(_make_cell(str(row.get(key, "")), colour, column))
+			line.add_child(_make_cell(str(row.get(key, "")), colour, column))
+
+		_grid.add_child(line)
+
+
+func _make_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(column_gap))
+	return row
 
 
 func _make_cell(text: String, colour: Color, column: Dictionary) -> Label:
@@ -136,13 +161,33 @@ func _make_cell(text: String, colour: Color, column: Dictionary) -> Label:
 	) as HorizontalAlignment
 	label.clip_text = true
 
-	var width := float(column.get("width", 0.0))
+	# AN ABSENT WIDTH IS AN EQUAL SHARE, NOT NOTHING.
+	#
+	# It used to be `0.0` -> `SIZE_FILL`, which reads as "take your content's width" and is
+	# not, because `clip_text` two lines above sets a Label's minimum size to ZERO. So a
+	# column with no width collapsed to nothing and the one column that had one took the
+	# whole row -- and `scoreboard_columns()` gives a width only to `name`.
+	#
+	# What that means is that **every scoreboard and every server browser in this family
+	# has shown one column**: no kills, no deaths, no assists, no score, no ping, no mass,
+	# no player count. The data was right, the columns were in `describe()`, and the suite
+	# asserted both. A rendered frame of game-arena's scoreboard is what showed it, and
+	# there is no assertion that could have: the cells exist, the rows exist, and the
+	# widths they were laid out at are a property of a frame nothing was drawing.
+	#
+	# A column that genuinely wants to shrink to its content asks for it by name, because
+	# that is the rarer thing and the one worth spelling.
+	var width := float(column.get("width", 1.0))
 
 	if width > 0.0:
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.size_flags_stretch_ratio = width
 	else:
-		label.size_flags_horizontal = Control.SIZE_FILL
+		# Explicitly zero, and therefore explicitly asked for. `clip_text` is turned off
+		# with it: a column sized to its content whose minimum size is zero is a column
+		# that is not there, which is the bug above.
+		label.clip_text = false
+		label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	return label
 

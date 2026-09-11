@@ -37,7 +37,7 @@ The same rule applies to types: dot-ui names nothing outside dot-core.
 - `DotFeedView.add_kill` takes strings and colours, not a `DotKillFeed.Entry`.
 - `DotTableView` takes columns and rows of dictionaries, not a `DotScoreboard`.
 - `DotStatBar` and `DotCrosshair` take `Callable`s, not a `DotHealth` or a
-  `DotWeaponState`.
+  `DotWeaponBallistics`.
 
 `DotTableView.scoreboard_columns()` is the one concession: the standard columns as
 data, so a game does not reinvent them, without dot-ui knowing what fills them.
@@ -148,6 +148,52 @@ a file written by a different tool.
 `ui_*` actions are hidden by default: they are the engine's navigation, and rebinding
 them from a settings screen breaks the settings screen.
 
+## Two screens every game was writing for itself
+
+`DotPauseScreen` and `DotSettingsScreen`, in `screens/`. Four clients in this family had independently written the same forty lines — a centred `PanelContainer`, a heading, a column of `Button`s, a focus path — and differed only in which words were on the buttons and which document the panel was bound to. Two copies of one thing is this tree's most expensive mistake; four is that mistake with a number on it.
+
+**The settings source is an `Object` and is never named.** dot-ui depends on dot-core and nothing else, and a script that so much as *mentions* `DotSettingsManager` fails to compile in a project without dot-settings — which is most of them. The contract is two methods, `to_config()` and `absorb_config()`, and that the screen also accepts a bare `DotConfig` is the proof the seam is real. Same shape as dot-chat's backbone client.
+
+**The two-step apply is the whole reason the screen exists.** `to_config()` hands out a *snapshot*: writing to it does not write to the manager. A screen that called only `DotSettingsPanel.apply()` would report success and change nothing, for ever — and every structural check about it passes either way. It builds, it has a size, it has focus, the panel has editors. Only a check that edits a value, presses Apply and then reads the **manager** can tell the two apart.
+
+**A pause menu's button ids are derived from its labels**, never paired with them. `"Rock the vote"` is `&"rock_the_vote"`. A list of labels and a parallel list of ids is two lists that can disagree, and this tree has paid for that shape more than any other.
+
+**`id_override`, not `screen_id`.** `DotScreen` already has a `screen_id()` method and a property cannot shadow one — GDScript refuses it with *"Could not resolve external class member"*, reported against the file that **uses** the property rather than the one that declares it, with `--check-only` on the declaring file saying nothing. The scene then hangs rather than failing. It is configurable at all because a game legitimately has two of these: the player's settings and the interface's own `DotUiConfig` are different documents, and a stack registers by id.
+
+## The addon that draws had no picture of anything
+
+`tools/screenshot.sh` renders `DotPauseScreen` and `DotSettingsScreen` to `screenshots/` through `xvfb-run`. It found two bugs on its first run, and neither was reachable from any assertion:
+
+**The pause menu drew nothing at all.** `DotScreen._screen_id()` defaults to `StringName(name)` — the NODE NAME — so a screen called `Pause` registered as `&"Pause"` and `push(&"pause")` answered "no such screen". That is reported and nothing treats it as fatal, so the menu simply never opened. **Every structural check passed**, in this suite and in game-playground's, because a *registered* screen is sized and focusable whether or not it is on screen: the size check, the focus-path check and the button check were all asserting a screen that was not there. `DotPauseScreen` declares `id_override` now, and both suites assert `stack.top_id()` after the push — which is the check that was missing.
+
+**The settings panel grew past the bottom of the window**, taking Apply, Revert and Back with it: a settings screen a player can read and cannot save from or leave. A `DotSettingsPanel` is as tall as the document it was handed and `DotUiConfig` alone comes out around 600 pixels. The rows are in a `ScrollContainer` now and the buttons sit below it.
+
+### Three assertions were tried against that second one and none of them could fail
+
+| tried | why it passed with the bug in place |
+| --- | --- |
+| Apply is inside the panel | a `PanelContainer` **grows** to fit, so the button stays inside a panel that has itself left the window |
+| Apply is inside the screen | **a headless viewport is 64 × 64**, so every screen in this suite is 64 × 64 and nothing measured against one means anything |
+| a long and a short document give the same-sized panel | at 64 × 64 the layout resolves the same either way |
+
+Each was armed by replacing the `ScrollContainer` with a plain box and re-running. None fired. What ships is the **structure plus the reason** — the panel is inside a scroll, the buttons are outside it — which does fire, and the real guard is the screenshot.
+
+### And pointing one at a game's own screens found three more
+
+`game-arena/tools/screenshot_menus.sh` renders that game's pause, controls and scoreboard — the screens this addon does not own. Two of the three bugs were in **this addon**:
+
+- **`DotTableView`: an absent column `width` collapsed the column to nothing.** It meant `SIZE_FILL`, which reads as "take your content's width" and is not, because `clip_text` sets a `Label`'s minimum size to zero. `scoreboard_columns()` gives a width only to `name` — so **every scoreboard and every server browser in this family drew one column**, with the data correct and `describe()` agreeing. An absent width is an equal share now; zero means "shrink to the content" and turns `clip_text` off with it.
+- **`DotTableView` honoured no column width at all, ever.** It used a `GridContainer`, which gives every column the SAME width whatever ratio a cell asks for — `size_flags_stretch_ratio` is read by a `BoxContainer` and by nothing else. Measured: four columns declaring 0.4, 3.0, 1.0 and 1.0 came out **308 pixels each**. `width` was documented here, set to 3.0 for the name column in `scoreboard_columns()`, copied into four games' lists, and inert in all of them — which is why long player names were clipped in a table with empty space in it. It is a `VBoxContainer` of `HBoxContainer`s now; the columns still line up across rows because every row is built from the same ratios at the same width. **The first fix made this visible rather than fixing it**: with the columns collapsed to nothing, nobody could see that the widths they came back at were equal. A second picture of the corrected screen is what found it.
+- **`DotBindingsPanel.rebindable_actions()` said "sorted" and was not.** `out.sort()` on an `Array[StringName]` compares **interned pointers** — the same trap that gave two peers two different wire ids for one message type in dot-net. The rebinder listed Noclip, Walk, Sprint, Crouch, Jump, Back, Forward, Right, Left, in an order that is not stable between builds either. Sorted as Strings now, and the label drops the `prefix`, which is the part that is not information.
+
+### The HUD too, which nothing had ever looked at
+
+`screenshot.sh` draws a third frame: a `DotStatBar` pair, a `DotCrosshair` and a `DotFeedView` with names of the length a real one has. Every check about those is a number or a property — the bar's eased value, the crosshair's computed gap, the feed's opacity at a given millisecond — all correct, and none of them says whether the thing is legible.
+
+It found no bug, and one thing worth keeping anyway: **a fixture picked at random misses the state worth seeing.** Health at 28% draws in the ordinary colour, because `low_fraction` is 0.25 — and a bar that never goes below the threshold looks exactly like one whose `low_colour` does not work. The fixture is 18 now, and the picture shows red.
+
+That 64 × 64 is worth carrying away on its own: **no assertion in any headless suite in this family can say anything about layout relative to the window.** `size.y > 0` passes at 64 as happily as at 800.
+
 ## Validating changes
 
 ```bash
@@ -160,7 +206,8 @@ done
 godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
-138 checks, all offline. **Nothing is rendered** — a headless run has no display — and
+168 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
+checks is rendered** — a headless run has no display, and its viewport is 64 × 64 — and
 nothing tested depends on rendering. `DotFeedView.expire()` and `opacity_of()` take an
 explicit millisecond clock so the fade can be tested without waiting out six real
 seconds.
@@ -193,6 +240,6 @@ screen on a stack whose parent is a plain `Node`.
   dot-auth's backbone client and the site's listing API.
 - **Nine-patch or textured styling.** Deliberate — see "ships no art". A game assigns
   its own `Theme` and every widget here obeys it.
-- **Touch controls.** dot-fps-controller ships `DotFpsTouchSampler`, which turns
+- **Touch controls.** dot-player-controller ships `DotFpsTouchSampler`, which turns
   fingers into commands and deliberately ships no layout. The on-screen buttons that
   drive it are a game's design, and `DotScreen` is enough to build them on.

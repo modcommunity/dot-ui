@@ -62,7 +62,7 @@ The second idea is that **dot-ui ships no art and imports nothing.** No textures
 
 ## `DotSettingsPanel` reads the config you already wrote
 
-Every project in this family already describes its settings — keys, types, ranges, enum choices, groups, and which ones are secrets — in `@export` annotations. A hand-built settings screen restates all of that and then drifts from it, one field at a time, until a setting exists that no screen can reach.
+Every project in this family already describes its settings in `@export` annotations: keys, types, ranges, enum choices, groups, and which ones are secrets. A hand-built settings screen restates all of that and then drifts from it, one field at a time, until a setting exists that no screen can reach.
 
 So this reads the config and builds the controls. It honours `sensitive_keys()`, for the same reason `DotConfig` refuses secrets from the environment and argv: they end up in screenshots and pasted bug reports.
 
@@ -70,11 +70,11 @@ Edits are held until `apply()`, and **an invalid set is rolled back entirely**. 
 
 ## Widgets pull
 
-A health bar wired to a `health_changed` signal misses the change that happened before it was created, and fires four times when four things change in one tick. A `DotHudWidget` holds a `Callable` that reads the value, on a throttle — ten times a second by default, which is faster than anyone can read, with an immediate path for anything where lateness is a lie.
+A health bar wired to a `health_changed` signal misses the change that happened before it was created, and fires four times when four things change in one tick. A `DotHudWidget` holds a `Callable` that reads the value, on a throttle of ten times a second by default, which is faster than anyone can read, with an immediate path for anything where lateness is a lie.
 
 ## The crosshair does the projection
 
-`gap_pixels()` is `half_viewport_height / tan(fov/2)` — the focal length in pixels — times `tan(spread)`. A crosshair that opens by an arbitrary amount is worse than a fixed one: it tells the player something confident and wrong about where their shots will go, and a crosshair that assumes a 90° field of view is wrong at every other setting.
+`gap_pixels()` is `half_viewport_height / tan(fov/2)`, the focal length in pixels, times `tan(spread)`. A crosshair that opens by an arbitrary amount is worse than a fixed one: it tells the player something confident and wrong about where their shots will go, and a crosshair that assumes a 90° field of view is wrong at every other setting.
 
 ## Validating
 

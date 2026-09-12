@@ -24,6 +24,7 @@ const SETTLE := 3
 
 var _stack: DotScreenStack = null
 var _hud: DotHud = null
+var _chat: DotChatWindow = null
 var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
@@ -69,6 +70,11 @@ func _initialize() -> void:
 		{"id": &"settings", "file": "settings.png"},
 		# Nothing, so the HUD behind the stack is what is drawn.
 		{"id": &"", "file": "hud.png"},
+		# The same HUD with the chat box open. Two pictures rather than one because the
+		# closed state is the one every player spends the match looking at, and the open
+		# state is the only one with a prompt, a caret and a line that must not overlap
+		# the log above it.
+		{"id": &"", "file": "chat.png", "chat": true},
 	]
 
 
@@ -93,7 +99,7 @@ func _build_hud() -> void:
 	health.name = "Health"
 	health.max_value = 100.0
 	health.suffix = " HP"
-	health.position = Vector2(40.0, 640.0)
+	health.position = Vector2(40.0, 470.0)
 	health.custom_minimum_size = Vector2(240.0, 28.0)
 	health.size = health.custom_minimum_size
 	_hud.add_child(health)
@@ -108,7 +114,7 @@ func _build_hud() -> void:
 	armour.max_value = 100.0
 	armour.suffix = " AR"
 	armour.fill_colour = Color(0.65, 0.72, 0.85)
-	armour.position = Vector2(40.0, 680.0)
+	armour.position = Vector2(40.0, 510.0)
 	armour.custom_minimum_size = Vector2(240.0, 28.0)
 	armour.size = armour.custom_minimum_size
 	_hud.add_child(armour)
@@ -141,6 +147,37 @@ func _build_hud() -> void:
 	)
 	feed.add_kill("", Color.WHITE, "fell", "newcomer", Color(0.45, 0.75, 1.0))
 
+	# Moved up off the bottom-left corner, because that is where the chat box goes by
+	# default and the first picture of the two together was a stat bar drawn through a
+	# line of chat. Which is a real warning for a game, not only for this fixture: see
+	# `DotChatWindow.place_bottom_left`.
+	#
+	# The chat box, with the traffic a real one has: a long handle, a line long enough to
+	# reach the right edge, a system line with no speaker, and a team line in the team
+	# colour. A box that lays out correctly for "hi" is a box nobody has looked at.
+	_chat = DotChatWindow.new()
+	_chat.name = "Chat"
+	_chat.register_actions = false
+	# Nothing expires in a screenshot. Under software rendering a frame takes the better
+	# part of a second, so a ten-second lifetime is spent before the grab — which is a
+	# picture of an empty log that looks exactly like a log that cannot draw.
+	_chat.lifetime_sec = 0.0
+	_chat.channels = [
+		{"id": &"all", "label": "Say", "colour": Color(0.88, 0.90, 0.94)},
+		{"id": &"team", "label": "Say (TEAM)", "colour": Color(0.55, 0.85, 0.60), "team": true},
+	]
+	_hud.add_child(_chat)
+
+	_chat.add_text("Welcome to the server.", Color(0.80, 0.82, 0.86))
+	_chat.add_said("gamemann", "anybody up for a round on the atrium map?")
+	_chat.add_said("a_very_long_display_name", "give me a minute, reloading content")
+	_chat.add_said("quiet_one", "rotating B, need one more", Color(0.55, 0.85, 0.60))
+	_chat.add_said(
+		"bo",
+		"that long sentence above is the one that matters here: it has to wrap inside the"
+			+ " box rather than run across the middle of the screen"
+	)
+
 
 func _process(_delta: float) -> bool:
 	if _done:
@@ -154,6 +191,11 @@ func _process(_delta: float) -> bool:
 
 	if _wait == SETTLE:
 		_stack.clear()
+
+		if bool(shot.get("chat", false)):
+			_chat.open(&"team")
+		else:
+			_chat.close()
 
 		# An empty id means "show nothing", which is how the HUD gets a frame of its own:
 		# the stack's `hides_below` takes it down under an opaque screen, deliberately.

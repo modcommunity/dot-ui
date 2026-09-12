@@ -36,6 +36,19 @@ signal capture_ended()
 ## Godot's own `ui_*` actions.
 @export var prefix: String = ""
 
+## Further prefixes to show, beside [member prefix].
+##
+## [b]A game's bindable actions are not all in one namespace, and assuming they were left
+## a real one off every rebinding screen in this family.[/b] A first-person game's movement
+## is `dot_fps_*`, registered by dot-player-controller; its chat key is its own
+## `<game>_chat`. A panel filtered on one prefix shows one of those and silently drops the
+## other — and an action that appears on no rebinding screen is an action a player cannot
+## discover, which is the same "produced correctly and reachable from nothing" this family
+## keeps paying for.
+##
+## Empty is the ordinary case. [member prefix] alone still works exactly as it did.
+@export var also_prefixed: PackedStringArray = PackedStringArray()
+
 ## Show Godot's built-in `ui_*` actions.
 ##
 ## Off by default: they are the engine's navigation, rebinding them from a settings
@@ -103,10 +116,9 @@ func build() -> DotResult:
 		# The prefix is stripped, because it is exactly the part that is not information.
 		# A player reading "Dot Fps Noclip" is being shown which addon implements their
 		# movement; what they came for is "Noclip".
-		var shown := String(action)
-
-		if prefix != "" and shown.begins_with(prefix):
-			shown = shown.substr(prefix.length())
+		# Whichever prefix matched is the one stripped, so a panel showing two
+		# namespaces does not label one of them with its namespace still on it.
+		var shown := _without_prefix(String(action))
 
 		label.text = shown.replace("_", " ").capitalize()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -137,7 +149,7 @@ func rebindable_actions() -> Array[StringName]:
 		if not show_builtin and name_str.begins_with("ui_"):
 			continue
 
-		if prefix != "" and not name_str.begins_with(prefix):
+		if not _wanted(name_str):
 			continue
 
 		if locked.has(action):
@@ -167,6 +179,33 @@ func rebindable_actions() -> Array[StringName]:
 	for name_str in as_strings:
 		out.append(StringName(name_str))
 	return out
+
+
+## An action's name with whichever accepted prefix it starts with removed.
+func _without_prefix(name_str: String) -> String:
+	if prefix != "" and name_str.begins_with(prefix):
+		return name_str.substr(prefix.length())
+
+	for extra in also_prefixed:
+		if extra != "" and name_str.begins_with(extra):
+			return name_str.substr(extra.length())
+
+	return name_str
+
+
+## Whether an action's name matches [member prefix] or any of [member also_prefixed].
+func _wanted(name_str: String) -> bool:
+	if prefix == "" and also_prefixed.is_empty():
+		return true
+
+	if prefix != "" and name_str.begins_with(prefix):
+		return true
+
+	for extra in also_prefixed:
+		if extra != "" and name_str.begins_with(extra):
+			return true
+
+	return false
 
 
 ## The current binding as a readable string.

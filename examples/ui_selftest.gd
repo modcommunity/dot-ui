@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 168
+const CHECKS := 218
 
 var _passed := 0
 var _failed := 0
@@ -101,6 +101,8 @@ func _run() -> void:
 	_test_settings_panel()
 	_test_settings_apply()
 	_test_bindings()
+	_test_input_binding()
+	_test_chat_window()
 	await _test_settings_screen()
 
 	DotPaths.remove_tree(BINDINGS_FILE)
@@ -1286,6 +1288,339 @@ func _test_bindings() -> void:
 			% [label_texts]
 	)
 
+	# [b]A game's bindable actions are not all in one namespace.[/b] A first-person game's
+	# movement is `dot_fps_*` and its chat key is its own `<game>_chat`; a panel filtered on
+	# one prefix showed one of those and silently dropped the other, which is an action a
+	# player cannot discover on any screen.
+	InputMap.add_action("other_chat")
+
+	var two_panel := DotBindingsPanel.new()
+	two_panel.prefix = "probe_"
+	two_panel.also_prefixed = PackedStringArray(["other_"])
+	add_child(two_panel)
+	two_panel.build()
+
+	var both := PackedStringArray()
+	for action in two_panel.rebindable_actions():
+		both.append(String(action))
+
+	_check(
+		Array(both).has("other_chat") and Array(both).has("probe_alpha"),
+		"a second prefix shows the actions the first one filtered out (%s)" % [both]
+	)
+
+	var two_labels := PackedStringArray()
+	for child in two_panel.get_children():
+		var row := child as Control
+		if row == null or row.get_child_count() == 0:
+			continue
+		var l := row.get_child(0) as Label
+		if l != null:
+			two_labels.append(l.text)
+
+	_check(
+		Array(two_labels).has("Chat") and not Array(two_labels).has("Other Chat"),
+		"and the prefix that MATCHED is the one stripped from the label (%s)" % [two_labels]
+	)
+
+	two_panel.queue_free()
+	InputMap.erase_action("other_chat")
+
 	sorted_panel.queue_free()
 	for name_str in ["probe_zulu", "probe_alpha", "probe_mike"]:
 		InputMap.erase_action(name_str)
+
+
+# --- The binding codec -----------------------------------------------------
+
+func _test_input_binding() -> void:
+	print("")
+	print("input binding text")
+
+	var y := InputEventKey.new()
+	y.physical_keycode = KEY_Y
+
+	_check(DotInputBinding.to_text(y) == "Y", "a key is its own name")
+
+	var back := DotInputBinding.from_text("Y") as InputEventKey
+	_check(
+		back != null and back.physical_keycode == KEY_Y,
+		"and reads back as the same PHYSICAL key",
+		"a keycode round-trip binds the wrong key on a non-QWERTY layout"
+	)
+
+	var shifted := InputEventKey.new()
+	shifted.physical_keycode = KEY_A
+	shifted.shift_pressed = true
+
+	var shift_text := DotInputBinding.to_text(shifted)
+	var shift_back := DotInputBinding.from_text(shift_text) as InputEventKey
+	_check(
+		shift_back != null and shift_back.physical_keycode == KEY_A and shift_back.shift_pressed,
+		"a modifier survives the round trip (%s)" % shift_text
+	)
+
+	var mouse := InputEventMouseButton.new()
+	mouse.button_index = MOUSE_BUTTON_MIDDLE
+	_check(DotInputBinding.to_text(mouse) == "Mouse 3", "a mouse button has a short form")
+	_check(
+		(DotInputBinding.from_text("Mouse 3") as InputEventMouseButton) != null,
+		"and comes back as a mouse button"
+	)
+
+	_check(DotInputBinding.from_text("") == null, "nothing is bound to nothing")
+	_check(DotInputBinding.from_text("Qwerty") == null, "and so is a word that is not a key")
+	_check(not DotInputBinding.is_bound("Qwerty"), "is_bound agrees")
+
+	# The replacement rule. `action_add_event` on an action that already has one leaves
+	# BOTH bound, so a rebound key still works on its old one — invisible until a player
+	# rebinds crouch onto their forward key and both still fire.
+	DotInputBinding.apply(&"probe_chat", "Y")
+	DotInputBinding.apply(&"probe_chat", "T")
+
+	_check(
+		InputMap.action_get_events(&"probe_chat").size() == 1,
+		"applying a binding twice leaves one binding, not two",
+		"a rebound action that still answers to its old key"
+	)
+	_check(
+		DotInputBinding.describe_action(&"probe_chat") == "T",
+		"and it is the new one"
+	)
+
+	# ensure_action is the boot path: it must never overwrite what a player chose.
+	DotInputBinding.ensure_action(&"probe_chat", "Y")
+	_check(
+		DotInputBinding.describe_action(&"probe_chat") == "T",
+		"ensure_action leaves an action that already has a binding alone"
+	)
+
+	DotInputBinding.apply(&"probe_chat", "")
+	_check(
+		InputMap.has_action(&"probe_chat")
+			and InputMap.action_get_events(&"probe_chat").is_empty(),
+		"an empty binding unbinds the action rather than deleting it"
+	)
+	DotInputBinding.ensure_action(&"probe_chat", "Y")
+	_check(
+		DotInputBinding.describe_action(&"probe_chat") == "Y",
+		"and ensure_action then gives an unbound action its default back"
+	)
+
+	_check(
+		DotInputBinding.describe_action(&"probe_missing") == "",
+		"an action that does not exist describes as nothing rather than erroring"
+	)
+
+	InputMap.erase_action(&"probe_chat")
+
+
+# --- The chat window -------------------------------------------------------
+
+func _test_chat_window() -> void:
+	print("")
+	print("chat window")
+
+	var window := DotChatWindow.new()
+	window.open_action = &"probe_chat_open"
+	window.team_action = &"probe_chat_team"
+	window.cycle_action = &""
+	window.channels = [
+		{"id": &"all", "label": "Say", "colour": Color.WHITE},
+		{"id": &"team", "label": "Team", "colour": Color.GREEN, "team": true},
+	]
+	add_child(window)
+
+	_check(
+		DotInputBinding.describe_action(&"probe_chat_open") == "Y",
+		"the box registers its open key at Y when the project has no action for it"
+	)
+	_check(
+		DotInputBinding.describe_action(&"probe_chat_team") == "U",
+		"and team chat at U"
+	)
+	_check(window.channel() == &"all", "it starts on the first channel")
+	_check(not window.is_open(), "and closed")
+	_check(
+		window.entry() != null and not window.entry().visible,
+		"with nothing to type in until it is opened"
+	)
+	_check(
+		window.entry().max_length == window.max_length,
+		"the line carries the length limit the server will also enforce"
+	)
+
+	var opened_on: Array[StringName] = []
+	# A one-element array, not an int: a lambda captures a primitive BY VALUE, so
+	# `closes += 1` inside one increments a copy and the counter outside stays zero.
+	var closes := [0]
+	var said: Array[Dictionary] = []
+	window.opened.connect(func(c: StringName) -> void: opened_on.append(c))
+	window.closed.connect(func() -> void: closes[0] += 1)
+	window.submitted.connect(
+		func(text: String, c: StringName) -> void: said.append({"text": text, "channel": c})
+	)
+
+	window.open()
+	_check(window.is_open() and opened_on == [&"all"], "opening says which channel it opened on")
+	_check(window.entry().visible, "and shows the line")
+
+	# The hold rule: a line must not fade while somebody is reading it.
+	window.add_said("someone", "hello")
+	_check(window.line_count() == 1, "a line lands in the log")
+	_check(
+		window.feed().expire(Time.get_ticks_msec() + 600_000) == 0,
+		"nothing expires while the box is open",
+		"a message that fades while you read it is one you have to ask for again"
+	)
+
+	window.entry().text = "  hello there  "
+	window.entry().text_submitted.emit(window.entry().text)
+
+	_check(said.size() == 1 and said[0]["text"] == "hello there", "a submitted line is trimmed")
+	_check(
+		said.size() == 1 and said[0]["channel"] == &"all",
+		"and carries the channel it was typed on"
+	)
+	_check(not window.is_open() and closes[0] == 1, "and the box closes behind it")
+	_check(
+		window.feed().expire(Time.get_ticks_msec() + 600_000) == 1,
+		"once closed, the log expires again"
+	)
+
+	# An empty line is how a player abandons one, and it must not reach the server.
+	window.open()
+	window.entry().text = "   "
+	window.entry().text_submitted.emit(window.entry().text)
+	_check(said.size() == 1, "an empty line sends nothing")
+	_check(not window.is_open(), "and still closes the box")
+
+	# Escape, on the entry's own gui_input, which is the path a focused LineEdit takes.
+	window.open()
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	window.entry().gui_input.emit(escape)
+	_check(not window.is_open(), "escape closes the box")
+
+	# Recall. Up walks back through what was sent, down walks forward again.
+	window.open()
+	var up := InputEventKey.new()
+	up.keycode = KEY_UP
+	up.pressed = true
+	window.entry().gui_input.emit(up)
+	_check(window.entry().text == "hello there", "up recalls the last line sent")
+
+	var down := InputEventKey.new()
+	down.keycode = KEY_DOWN
+	down.pressed = true
+	window.entry().gui_input.emit(down)
+	_check(window.entry().text == "", "and down comes back to an empty line")
+	window.close()
+
+	# Channels.
+	var changed: Array[StringName] = []
+	window.channel_changed.connect(func(c: StringName) -> void: changed.append(c))
+	window.cycle_channel()
+	_check(window.channel() == &"team" and changed == [&"team"], "cycling moves to the next channel")
+	window.cycle_channel()
+	_check(window.channel() == &"all", "and wraps")
+
+	window.open(&"nonsense")
+	_check(
+		window.channel() == &"all",
+		"opening on a channel the box does not have keeps the one it was on",
+		"a game with no teams must not end up sending to a channel nobody receives"
+	)
+	window.close()
+
+	opened_on.clear()
+	window.open(&"team")
+	_check(window.channel() == &"team", "and opening on one it does have moves there")
+	window.close()
+
+	# `enabled` is the switch for a deployment whose players chat somewhere else.
+	window.enabled = false
+	window.open()
+	_check(not window.is_open(), "a disabled box does not open")
+	window.add_said("someone", "but you can still hear this")
+	_check(
+		window.line_count() > 0,
+		"and still shows what was said",
+		"off means you cannot type, not that you are out of the conversation"
+	)
+
+	window.enabled = true
+	window.open()
+	_check(window.is_open(), "and it opens again when it is turned back on")
+	window.enabled = false
+	_check(not window.is_open(), "turning it off while it is open closes it")
+
+	# --- The two things only a picture found -------------------------------
+
+	# [b]A line put in before the engine readied the node.[/b] A host that builds the box
+	# and immediately announces something — or builds it in `SceneTree._initialize`, where
+	# nothing is inside the tree at all — was writing into a log that did not exist yet,
+	# and the line vanished with nothing said.
+	var early := DotChatWindow.new()
+	early.register_actions = false
+	early.add_text("connecting to the server")
+	_check(
+		early.line_count() == 1,
+		"a line added before the box is readied is kept, not dropped",
+		"the log is built on demand, not in _ready"
+	)
+	add_child(early)
+	_check(early.line_count() == 1, "and survives being added to the tree")
+
+	# [b]Wrapping.[/b] DotFeedView draws an entry as one run of text and does not clip it,
+	# which is right for a kill feed and wrong for chat: the server's own limit is 127
+	# characters and the box is 460 pixels wide, so an ordinary sentence ran out of the box
+	# and across the middle of the screen.
+	early.clear()
+	early.add_said("someone", "short")
+	var short_rows := early.line_count()
+	_check(short_rows == 1, "a line that fits is one row")
+
+	early.clear()
+	early.add_said(
+		"someone",
+		"a sentence long enough that it cannot possibly fit inside four hundred and sixty"
+			+ " pixels of a chat box, which is the ordinary case rather than the extreme one"
+	)
+	_check(
+		early.line_count() > 1,
+		"and one that does not is wrapped across several (%d)" % early.line_count(),
+		"unwrapped, chat runs out of the box and across the screen"
+	)
+
+	# The wrap must not cost any of what was said.
+	var joined := ""
+	for row in early.feed().lines():
+		for part in (row["parts"] as Array):
+			joined += str((part as Dictionary).get("text", ""))
+	_check(
+		joined.contains("the ordinary case rather than the extreme one"),
+		"wrapping keeps every word, rather than truncating the end"
+	)
+
+	# Rows are bounded by what the box is tall enough to draw, or the overflow is drawn
+	# straight through the field somebody is typing in.
+	early.clear()
+	early.max_lines = 3
+	early.feed().max_lines = 3
+	for i in range(8):
+		early.add_text("line %d" % i)
+	_check(early.line_count() == 3, "the log keeps only as many rows as it can draw")
+
+	early.queue_free()
+
+	var state := window.describe()
+	_check(
+		str(state.get("open_binding", "")) == "Y",
+		"describe() reports the key, which is what a bug report needs"
+	)
+
+	window.queue_free()
+	InputMap.erase_action(&"probe_chat_open")
+	InputMap.erase_action(&"probe_chat_team")

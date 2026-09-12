@@ -148,6 +148,38 @@ a file written by a different tool.
 `ui_*` actions are hidden by default: they are the engine's navigation, and rebinding
 them from a settings screen breaks the settings screen.
 
+## The chat box four games did not have
+
+`DotChatWindow`, in `hud/`. A log that fades, a line to type in, and a key that opens it.
+
+**It is here rather than in dot-chat for the reason `DotFeedView` is here.** dot-chat is the decision layer — who hears a line, what it may contain, what name is drawn beside it — and it ships no art on purpose. What happened next is what always happens: four clients in this family could *receive* a chat line and could not *send* one. game-arena's own note called that "a level of ambition rather than an oversight" on the grounds that a scrolling window with an input field is a `DotScreen`. It is not: a screen is modal and takes the whole display, and a chat box is eight lines in a corner that has to leave the game visible behind it. That is a HUD widget.
+
+So this knows nothing about chat. It takes coloured fragments to draw and emits the string somebody typed; a game hands `submitted` to whatever its send path already is and feeds arriving lines back through `add_message`. dot-ui still depends on dot-core and nothing else.
+
+**The open key is an action, not a key.** `open_action` names an `InputMap` action so the binding is the player's — rebindable through `DotBindingsPanel`, or stored in a settings document as text through `DotInputBinding`. `KEY_Y` hardcoded is a key nobody can move, on a keyboard whose Y is somewhere else.
+
+### Three bugs in it, and a picture found all three
+
+- **Consuming keys in `_input` starved the line edit of the keys being typed.** Godot delivers an event to `_input`, *then* to the focused control, then to shortcut and unhandled input. The first draft consumed every key in `_input` to keep them away from the game, which is a chat box nobody can type in. What actually keeps keys out of a game is the focused `LineEdit` itself; what this adds is `gui_input` on the entry, ahead of it, for escape, recall and the channel cycle.
+- **`anchor_right = 1.0` on a fresh `Control` leaves it nought pixels wide.** The setter *recomputes the offsets to preserve the control's current rectangle*, and a control built in code has no rectangle yet — so the log drew nothing while every property about it read correctly. This family has now paid for that trap seven times; every offset here is set explicitly, and all four of them after the anchors.
+- **A line put in before `_ready` vanished.** A host that builds the box and immediately announces something — or builds it in `SceneTree._initialize`, where *nothing* is inside the tree and no `_ready` has run — was writing into a log that did not exist. The pieces are built on demand now, and `ui_selftest` asserts a line added before the node is readied survives.
+
+**And the log wraps, which `DotFeedView` does not.** A feed entry is two names and a weapon; a chat line is up to the server's 127 characters, and unwrapped it runs out of the box and across the middle of the screen. `DotChatWindow._wrap` splits at word boundaries, keeping each fragment's colour, so a wrap inside what somebody said does not take the speaker's colour with it. It wraps rather than truncating: chat is the one place where the text *is* the content.
+
+`max_lines` bounds **rows**, not messages, and the box's height is derived from it — two numbers for one thing is two numbers that disagree, and the way they disagree is a log drawn through the field somebody is typing in. The log is anchored to the bottom and resized as lines arrive, so the newest line is always against the entry.
+
+`margin_left` and `margin_bottom` are separate because the thing in the way is never in both directions: game-arena has health and armour in that corner and needs the box lifted above them and still flush with the same left edge.
+
+## `DotInputBinding`: one binding as a short string
+
+`"Y"`, `"Shift+A"`, `"Mouse 1"`, `"Pad 0"`, `"Axis 0+"`. `DotBindingsPanel` stores a whole screen's worth as dictionaries in a file of its own, which is right for a rebinder; a *single* binding that travels in a settings document needs a form a person can read in a JSON file and type by hand, and `{"type":"key","code":89,"physical":true}` is neither.
+
+The vocabulary is deliberately the one `DotBindingsPanel.event_name` already draws on a button. Two spellings of one binding is a settings file that disagrees with the rebinding screen.
+
+**Keys are physical.** A binding stored as a keycode is stored in the player's current layout, and the same file on an AZERTY keyboard binds a key that is not where the label says.
+
+**`apply` replaces rather than adds.** `InputMap.action_add_event` on an action that already has one leaves *both* bound — a rebound key that still answers to its old one, invisible until somebody rebinds crouch onto their forward key and both fire. `ensure_action` is the boot path and never overwrites what a player chose.
+
 ## Two screens every game was writing for itself
 
 `DotPauseScreen` and `DotSettingsScreen`, in `screens/`. Four clients in this family had independently written the same forty lines — a centred `PanelContainer`, a heading, a column of `Button`s, a focus path — and differed only in which words were on the buttons and which document the panel was bound to. Two copies of one thing is this tree's most expensive mistake; four is that mistake with a number on it.
@@ -206,7 +238,7 @@ done
 godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
-168 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
+218 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
 checks is rendered** — a headless run has no display, and its viewport is 64 × 64 — and
 nothing tested depends on rendering. `DotFeedView.expire()` and `opacity_of()` take an
 explicit millisecond clock so the fade can be tested without waiting out six real

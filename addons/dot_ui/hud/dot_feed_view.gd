@@ -44,6 +44,26 @@ signal line_expired(line: Dictionary)
 
 @export var alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_RIGHT
 
+@export_group("Legibility")
+
+## Pixels of outline behind every line. Zero draws none, which is the old behaviour.
+##
+## [b]An outline rather than a panel, and it is not decoration.[/b] A feed is drawn over
+## whatever the game is showing, and a game is not one colour: white text is invisible over
+## a sand-coloured map in bright light and black text is invisible over a dark one. A panel
+## behind it fixes that and costs a rectangle of the game — which on a HUD that exists to
+## be glanced at is the wrong trade. An outline is readable over both and covers nothing.
+##
+## Measured in game-buses-from-hell, whose bowl is pale sand under a low sun: three chat
+## lines in three different colours, all of them unreadable, in a picture where every
+## property of every line was correct. Its own HUD labels had already solved it the same
+## way — which is what says this belongs here rather than in that game.
+@export_range(0, 16, 1) var outline_size: int = 0
+
+## What the outline is drawn in. Black at most of the way opaque, like every other outline
+## in this family.
+@export var outline_colour: Color = Color(0.0, 0.0, 0.0, 0.85)
+
 @export_group("Fade")
 
 ## Seconds a line spends fading out at the end of its life.
@@ -228,6 +248,23 @@ func _draw() -> void:
 			var colour: Color = fragment.get("colour", Color.WHITE)
 			colour.a *= alpha
 
+			if outline_size > 0:
+				# BEFORE the glyph, because an outline is drawn behind it — and with the
+				# line's own alpha, or a fading line leaves its outline hanging in the air.
+				var edge := outline_colour
+				edge.a *= alpha
+
+				draw_string_outline(
+					font,
+					Vector2(x, y),
+					text,
+					HORIZONTAL_ALIGNMENT_LEFT,
+					-1.0,
+					font_size,
+					outline_size,
+					edge
+				)
+
 			draw_string(
 				font,
 				Vector2(x, y),
@@ -249,4 +286,5 @@ func describe() -> Dictionary:
 		"max": max_lines,
 		"lifetime": lifetime_sec,
 		"hold": hold,
+		"outline": outline_size,
 	}

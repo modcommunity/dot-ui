@@ -170,6 +170,14 @@ So this knows nothing about chat. It takes coloured fragments to draw and emits 
 
 `margin_left` and `margin_bottom` are separate because the thing in the way is never in both directions: game-arena has health and armour in that corner and needs the box lifted above them and still flush with the same left edge.
 
+### A feed drawn over a bright map is a feed nobody can read
+
+`DotFeedView.outline_size`, off by default and therefore no change to anything that already draws one. Everything this addon draws goes over a *game*, and a game is not one colour: white text disappears over pale ground in bright light, black text disappears over a dark map, and a panel behind the text fixes both by covering a rectangle of the thing the player is trying to see — which on a widget that exists to be glanced at is the wrong trade.
+
+Measured in game-buses-from-hell, whose bowl is pale sand under a low sun: three chat lines in three different colours, all of them unreadable, in a rendered frame where every property of every line was correct and no assertion anywhere could have said so. That game's own HUD labels had already solved it the same way, independently, months earlier — **which is the argument for the option being here**: two solutions to one problem, one of them in a game, is the shape every other extraction in this file started from.
+
+`DotChatWindow.outline_size` passes it through, like `max_lines` and `line_height` before it.
+
 ## `DotInputBinding`: one binding as a short string
 
 `"Y"`, `"Shift+A"`, `"Mouse 1"`, `"Pad 0"`, `"Axis 0+"`. `DotBindingsPanel` stores a whole screen's worth as dictionaries in a file of its own, which is right for a rebinder; a *single* binding that travels in a settings document needs a form a person can read in a JSON file and type by hand, and `{"type":"key","code":89,"physical":true}` is neither.
@@ -183,6 +191,8 @@ The vocabulary is deliberately the one `DotBindingsPanel.event_name` already dra
 ## Two screens every game was writing for itself
 
 `DotPauseScreen` and `DotSettingsScreen`, in `screens/`. Four clients in this family had independently written the same forty lines — a centred `PanelContainer`, a heading, a column of `Button`s, a focus path — and differed only in which words were on the buttons and which document the panel was bound to. Two copies of one thing is this tree's most expensive mistake; four is that mistake with a number on it.
+
+**And for a while this paragraph was wrong about three of the four.** Writing the screens is not adopting them: game-playground moved onto both, game-simple-lobby and game-arena moved onto `DotSettingsScreen` only, and every one of the other five hand-written copies stayed exactly where it was — so the sentence above described work that had been *made possible* rather than work that had been done. All four are on both now. The general shape is worth naming because it is invisible from inside the addon: **an extraction is finished when the last caller moves, and nothing in the extracted repository can tell you whether that happened.** The grep is `grep -rn 'extends DotScreen'` over the games, against the list of screens this addon ships.
 
 **The settings source is an `Object` and is never named.** dot-ui depends on dot-core and nothing else, and a script that so much as *mentions* `DotSettingsManager` fails to compile in a project without dot-settings — which is most of them. The contract is two methods, `to_config()` and `absorb_config()`, and that the screen also accepts a bare `DotConfig` is the proof the seam is real. Same shape as dot-chat's backbone client.
 

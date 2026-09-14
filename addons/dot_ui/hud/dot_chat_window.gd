@@ -145,6 +145,13 @@ signal channel_changed(channel: StringName)
 ## rows as it takes, so [member max_lines] bounds what is DRAWN — which is the number that
 ## has to agree with the height, because a log allowed more rows than it is tall draws the
 ## overflow straight through the entry field underneath it.
+## Pixels of outline behind every line in the log. Zero draws none.
+##
+## Passed straight through to [DotFeedView]; see its own note for why an outline rather
+## than a panel. A game over a bright map wants 4 or 5 and a game over a dark one can
+## leave it off.
+@export_range(0, 16, 1) var outline_size: int = 0
+
 @export_range(8.0, 40.0, 1.0) var line_height: float = 18.0
 @export_range(0.0, 20.0, 1.0) var line_gap: float = 2.0
 
@@ -270,6 +277,7 @@ func _build() -> void:
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_feed.line_height = line_height
 	_feed.line_gap = line_gap
+	_feed.outline_size = outline_size
 	# The log above the entry, both anchored to the BOTTOM of the box, and the log
 	# re-sized as lines arrive so the newest one always sits just above the entry and
 	# older ones climb away from it. Anchored to the top instead — which is what a feed

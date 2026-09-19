@@ -174,7 +174,7 @@ So this knows nothing about chat. It takes coloured fragments to draw and emits 
 
 `DotFeedView.outline_size`, off by default and therefore no change to anything that already draws one. Everything this addon draws goes over a *game*, and a game is not one colour: white text disappears over pale ground in bright light, black text disappears over a dark map, and a panel behind the text fixes both by covering a rectangle of the thing the player is trying to see — which on a widget that exists to be glanced at is the wrong trade.
 
-Measured in game-buses-from-hell, whose bowl is pale sand under a low sun: three chat lines in three different colours, all of them unreadable, in a rendered frame where every property of every line was correct and no assertion anywhere could have said so. That game's own HUD labels had already solved it the same way, independently, months earlier — **which is the argument for the option being here**: two solutions to one problem, one of them in a game, is the shape every other extraction in this file started from.
+Measured in mg-buses-from-hell, whose bowl is pale sand under a low sun: three chat lines in three different colours, all of them unreadable, in a rendered frame where every property of every line was correct and no assertion anywhere could have said so. That game's own HUD labels had already solved it the same way, independently, months earlier — **which is the argument for the option being here**: two solutions to one problem, one of them in a game, is the shape every other extraction in this file started from.
 
 `DotChatWindow.outline_size` passes it through, like `max_lines` and `line_height` before it.
 

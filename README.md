@@ -110,3 +110,7 @@ godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
 136 checks, all offline, nothing rendered. Exits non-zero on any failure.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

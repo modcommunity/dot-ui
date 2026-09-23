@@ -75,6 +75,10 @@ var _buttons: Dictionary = {}
 ## action -> the events it had when the panel was built, for [method reset_all].
 var _defaults: Dictionary = {}
 
+## Entries the last [method load_saved] dropped: an action this build does not have, or
+## a value that is not a list. Counted only so the load line can say so.
+var _skipped_on_load: int = 0
+
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
@@ -409,7 +413,17 @@ func reset_all() -> void:
 ## Through [DotPaths.write_json], which does the temporary file, the rename and the
 ## browser's IndexedDB flush — a web build that wrote directly would lose the file on
 ## the next load.
+##
+## Every caller in this family ignores the result -- a menu saves and moves on -- so
+## the failure is logged here, where it cannot be skipped. WARN, because a player
+## whose rebinding silently did not persist is somebody's support ticket.
 func save() -> DotResult:
+	var res := _save()
+	DotLog.result(CHANNEL, "bindings not saved", res, DotLog.Level.WARN)
+	return res
+
+
+func _save() -> DotResult:
 	var data := {}
 
 	for action in rebindable_actions():
@@ -430,7 +444,31 @@ func save() -> DotResult:
 ## [b]An action that ends up with no events is put back to its default.[/b] A file that
 ## is truncated, hand-edited or written by an older build otherwise leaves the player
 ## with a control bound to nothing and no way to reach the rebinder for it.
+##
+## Logged here rather than by the caller, because every game in this family calls
+## [code]panel.load_saved()[/code] as a statement and drops the result. A bindings file
+## that cannot be read means the player is back on the defaults with no idea why: WARN.
+## A file that loads is DEBUG, with how many entries it skipped -- an action a newer
+## build renamed is dropped rather than applied, which is right, and is also exactly
+## the question "where did my key go" is asking.
 func load_saved() -> DotResult:
+	_skipped_on_load = 0
+	var res := _load_saved()
+
+	if res.ok:
+		if FileAccess.file_exists(config.bindings_file):
+			DotLog.debug(CHANNEL, "bindings loaded", {
+				"file": config.bindings_file,
+				"applied": res.value,
+				"skipped": _skipped_on_load,
+			})
+	else:
+		DotLog.result(CHANNEL, "saved bindings ignored", res, DotLog.Level.WARN)
+
+	return res
+
+
+func _load_saved() -> DotResult:
 	if not FileAccess.file_exists(config.bindings_file):
 		return DotResult.success(0)
 
@@ -468,11 +506,13 @@ func load_saved() -> DotResult:
 		var action := StringName(str(key))
 
 		if not InputMap.has_action(action):
+			_skipped_on_load += 1
 			continue
 
 		var events: Variant = bindings[key]
 
 		if typeof(events) != TYPE_ARRAY:
+			_skipped_on_load += 1
 			continue
 
 		var decoded: Array[InputEvent] = []

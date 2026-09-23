@@ -131,6 +131,14 @@ static func apply(action: StringName, text: String) -> String:
 	InputMap.action_erase_events(action)
 
 	if event == null:
+		# Text that names nothing is not the same as asking for nothing. A settings file
+		# that says "Qwerty" for a key has just left the action with no binding at all,
+		# and the player's only symptom is a key that does nothing. WARN, because the
+		# person who can fix it is whoever wrote that value, and the value is in a file.
+		if text.strip_edges() != UNBOUND:
+			DotLog.warn(CHANNEL, "a binding names no input, so the action is unbound", {
+				"action": String(action), "text": text,
+			})
 		return UNBOUND
 
 	InputMap.action_add_event(action, event)

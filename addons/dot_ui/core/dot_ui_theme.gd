@@ -13,7 +13,8 @@ extends Resource
 ## The palette is deliberately flat and high-contrast, which is what a dev-textured
 ## arena shooter wants anyway.
 
-const CHANNEL := "ui.theme"
+# No log channel: a value object. It turns a palette into a Theme and cannot fail
+# against anything outside the process.
 
 @export_group("Palette")
 

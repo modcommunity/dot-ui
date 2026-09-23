@@ -94,8 +94,20 @@ func set_hidden_by_game(hidden: bool) -> void:
 	_refresh_visibility()
 
 
+## DEBUG on the change, never on the call: "the HUD is gone" is a real bug report, and
+## the answer is always one of two flags -- a screen that hides what is below it, or a
+## game that hid it for a cinematic and never said so again. The line names which.
 func _refresh_visibility() -> void:
-	visible = not (_hidden_by_screen or _hidden_by_game)
+	var should_show := not (_hidden_by_screen or _hidden_by_game)
+
+	if should_show != visible:
+		DotLog.debug(CHANNEL, "hud shown" if should_show else "hud hidden", {
+			"by_screen": _hidden_by_screen,
+			"by_game": _hidden_by_game,
+			"top": String(_stack.top_id()) if _stack != null and is_instance_valid(_stack) else "",
+		})
+
+	visible = should_show
 
 
 ## Every [DotHudWidget] below this node.

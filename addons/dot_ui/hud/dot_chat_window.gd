@@ -220,6 +220,15 @@ func _register_actions() -> void:
 	if cycle_action != &"" and default_cycle_binding != "":
 		DotInputBinding.ensure_action(cycle_action, default_cycle_binding)
 
+	# What the keys ENDED UP as, not what was asked for: ensure_action keeps a binding the
+	# project or the player already has, so "Y does not open chat" is answered by this
+	# line saying chat is on T. DEBUG, once per window.
+	DotLog.debug(CHANNEL, "chat keys", {
+		"open": DotInputBinding.describe_action(open_action),
+		"team": DotInputBinding.describe_action(team_action),
+		"cycle": DotInputBinding.describe_action(cycle_action),
+	})
+
 
 func _place() -> void:
 	anchor_left = 0.0

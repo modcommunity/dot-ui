@@ -14,7 +14,8 @@ extends Control
 ## colours around a weapon, and rendering that from a single string means parsing it
 ## back out.
 
-const CHANNEL := "ui.feed"
+# No log channel: a drawer. Every line it shows was decided and logged by whoever
+# called add_line, and expiry is a clock, not an event anybody acts on.
 
 signal line_added(line: Dictionary)
 signal line_expired(line: Dictionary)

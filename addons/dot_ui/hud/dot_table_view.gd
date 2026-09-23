@@ -12,7 +12,8 @@ extends Control
 ## engine's text layout — column widths that depend on content, and clipping that
 ## depends on the widths.
 
-const CHANNEL := "ui.table"
+# No log channel: a drawer of rows it is handed. What the rows say, and anything that
+# went wrong producing them, belongs to the scoreboard or browser that built them.
 
 ## A row was clicked. [param index] is into the rows as last given, before sorting.
 signal row_activated(index: int, row: Dictionary)

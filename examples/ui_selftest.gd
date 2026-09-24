@@ -17,9 +17,17 @@ const BINDINGS_FILE := "user://test_bindings.json"
 
 const CHECKS := 218
 
+## Sections entered against sections that ran to their last line, and against this. A
+## runtime error inside a section aborts that function and nothing says so; a section that
+## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
+## total is the other half — see docs/testing.md.
+const SECTIONS := 17
+
 var _passed := 0
 var _failed := 0
 var _failures := PackedStringArray()
+var _entered := 0
+var _completed := 0
 
 
 ## A config with one of everything, including a secret, so the generated panel can be
@@ -113,6 +121,13 @@ func _run() -> void:
 	for line in _failures:
 		print("  FAIL  %s" % line)
 
+	print("%d of %d sections ran to their last line" % [_completed, _entered])
+	if _entered != SECTIONS or _completed != _entered:
+		print("ERROR: %d sections entered and %d completed, %d expected. One aborted or was skipped." % [
+			_entered, _completed, SECTIONS
+		])
+		get_tree().quit(1)
+		return
 	# The total the section counter cannot be. A runtime error inside a section aborts
 	# that function, and the counter is satisfied because the section had already
 	# announced itself. See docs/testing.md.
@@ -126,6 +141,16 @@ func _run() -> void:
 
 
 # --- Assertions ------------------------------------------------------------
+
+func _section(title: String) -> void:
+	_entered += 1
+	_group(title)
+
+
+## A section reached its last line. See [constant SECTIONS].
+func _done() -> void:
+	_completed += 1
+
 
 func _check(condition: bool, what: String, detail: String = "") -> bool:
 	if condition:
@@ -169,7 +194,7 @@ func _make_screen(id: StringName) -> TestScreen:
 # --- Theme -----------------------------------------------------------------
 
 func _test_theme() -> void:
-	_group("theme")
+	_section("theme")
 
 	var palette := DotUiTheme.dark()
 	var theme := palette.build(1.0)
@@ -208,12 +233,13 @@ func _test_theme() -> void:
 		light.text.get_luminance() < light.surface.get_luminance(),
 		"the light palette is actually light"
 	)
+	_done()
 
 
 # --- Screen stack ----------------------------------------------------------
 
 func _test_screen_stack() -> void:
-	_group("screen stack")
+	_section("screen stack")
 
 	var stack := _make_stack()
 	var menu := _make_screen(&"menu")
@@ -300,10 +326,11 @@ func _test_screen_stack() -> void:
 
 	stack.queue_free()
 	remove_child(stack)
+	_done()
 
 
 func _test_stack_visibility() -> void:
-	_group("screen stack: visibility")
+	_section("screen stack: visibility")
 
 	var stack := _make_stack()
 
@@ -342,10 +369,11 @@ func _test_stack_visibility() -> void:
 
 	stack.queue_free()
 	remove_child(stack)
+	_done()
 
 
 func _test_stack_input_blocking() -> void:
-	_group("screen stack: input")
+	_section("screen stack: input")
 
 	var stack := _make_stack()
 
@@ -387,10 +415,11 @@ func _test_stack_input_blocking() -> void:
 
 	stack.queue_free()
 	remove_child(stack)
+	_done()
 
 
 func _test_stack_refusal() -> void:
-	_group("screen stack: refusing to close")
+	_section("screen stack: refusing to close")
 
 	var stack := _make_stack()
 	var modal := _make_screen(&"modal")
@@ -425,12 +454,13 @@ func _test_stack_refusal() -> void:
 
 	stack.queue_free()
 	remove_child(stack)
+	_done()
 
 
 # --- HUD -------------------------------------------------------------------
 
 func _test_hud() -> void:
-	_group("hud")
+	_section("hud")
 
 	var stack := _make_stack()
 	var hud := DotHud.new()
@@ -479,10 +509,11 @@ func _test_hud() -> void:
 	remove_child(hud)
 	stack.queue_free()
 	remove_child(stack)
+	_done()
 
 
 func _test_widget_throttle() -> void:
-	_group("hud widget")
+	_section("hud widget")
 
 	var widget := DotHudWidget.new()
 	var reads: Array[int] = []
@@ -524,10 +555,11 @@ func _test_widget_throttle() -> void:
 
 	widget.queue_free()
 	remove_child(widget)
+	_done()
 
 
 func _test_stat_bar() -> void:
-	_group("stat bar")
+	_section("stat bar")
 
 	var bar := DotStatBar.new()
 	bar.max_value = 100.0
@@ -569,10 +601,11 @@ func _test_stat_bar() -> void:
 
 	bar.queue_free()
 	remove_child(bar)
+	_done()
 
 
 func _test_crosshair() -> void:
-	_group("crosshair")
+	_section("crosshair")
 
 	var crosshair := DotCrosshair.new()
 	crosshair.base_gap = 4.0
@@ -618,12 +651,13 @@ func _test_crosshair() -> void:
 
 	crosshair.queue_free()
 	remove_child(crosshair)
+	_done()
 
 
 # --- Feed and table --------------------------------------------------------
 
 func _test_feed() -> void:
-	_group("feed")
+	_section("feed")
 
 	var feed := DotFeedView.new()
 	feed.max_lines = 3
@@ -685,10 +719,11 @@ func _test_feed() -> void:
 
 	feed.queue_free()
 	remove_child(feed)
+	_done()
 
 
 func _test_table() -> void:
-	_group("table")
+	_section("table")
 
 	var table := DotTableView.new()
 	add_child(table)
@@ -722,6 +757,7 @@ func _test_table() -> void:
 
 	table.queue_free()
 	remove_child(table)
+	_done()
 
 
 # --- Settings --------------------------------------------------------------
@@ -786,7 +822,7 @@ func _test_table() -> void:
 
 
 func _test_settings_panel() -> void:
-	_group("settings panel")
+	_section("settings panel")
 
 	var config := TestConfig.new()
 	var panel := DotSettingsPanel.new()
@@ -835,10 +871,11 @@ func _test_settings_panel() -> void:
 	remove_child(panel)
 	filtered.queue_free()
 	remove_child(filtered)
+	_done()
 
 
 func _test_settings_apply() -> void:
-	_group("settings panel: applying")
+	_section("settings panel: applying")
 
 	var config := TestConfig.new()
 	var panel := DotSettingsPanel.new()
@@ -898,6 +935,7 @@ func _test_settings_apply() -> void:
 	remove_child(panel)
 	live_panel.queue_free()
 	remove_child(live_panel)
+	_done()
 
 
 # --- Bindings --------------------------------------------------------------
@@ -934,7 +972,7 @@ class FakeSettingsSource:
 
 
 func _test_settings_screen() -> void:
-	_group("settings screen")
+	_section("settings screen")
 
 	var stack := DotScreenStack.new()
 	stack.register_service = false
@@ -1116,6 +1154,7 @@ func _test_settings_screen() -> void:
 
 	stack.clear()
 	stack.queue_free()
+	_done()
 
 
 ## The node a settings screen's panel is parented to.
@@ -1127,7 +1166,7 @@ func panel_parent_of(screen: DotSettingsScreen) -> Node:
 
 
 func _test_bindings() -> void:
-	_group("bindings")
+	_section("bindings")
 
 	for action in [&"test_fire", &"test_jump", &"test_use"]:
 		if InputMap.has_action(action):
@@ -1329,13 +1368,14 @@ func _test_bindings() -> void:
 	sorted_panel.queue_free()
 	for name_str in ["probe_zulu", "probe_alpha", "probe_mike"]:
 		InputMap.erase_action(name_str)
+	_done()
 
 
 # --- The binding codec -----------------------------------------------------
 
 func _test_input_binding() -> void:
 	print("")
-	print("input binding text")
+	_section("input binding text")
 
 	var y := InputEventKey.new()
 	y.physical_keycode = KEY_Y
@@ -1413,13 +1453,14 @@ func _test_input_binding() -> void:
 	)
 
 	InputMap.erase_action(&"probe_chat")
+	_done()
 
 
 # --- The chat window -------------------------------------------------------
 
 func _test_chat_window() -> void:
 	print("")
-	print("chat window")
+	_section("chat window")
 
 	var window := DotChatWindow.new()
 	window.open_action = &"probe_chat_open"
@@ -1624,3 +1665,4 @@ func _test_chat_window() -> void:
 	window.queue_free()
 	InputMap.erase_action(&"probe_chat_open")
 	InputMap.erase_action(&"probe_chat_team")
+	_done()

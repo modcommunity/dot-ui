@@ -94,7 +94,10 @@ func build(labels: PackedStringArray) -> DotResult:
 	_ids.clear()
 
 	for label in labels:
-		var id := DotPauseScreen.id_for(label)
+		# Not this class's own name. A script that names itself in an expression, loaded after
+		# its base, cuts Godot 4.7.2's exit teardown short and leaks every script loaded before
+		# it. See docs/gdscript-hazards.md, "A script that names itself".
+		var id := id_for(label)
 		_ids.append(id)
 
 		var button := Button.new()

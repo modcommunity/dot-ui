@@ -25,6 +25,7 @@ const SETTLE := 3
 var _stack: DotScreenStack = null
 var _hud: DotHud = null
 var _chat: DotChatWindow = null
+var _ballot: DotBallotPanel = null
 var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
@@ -75,6 +76,11 @@ func _initialize() -> void:
 		# state is the only one with a prompt, a caret and a line that must not overlap
 		# the log above it.
 		{"id": &"", "file": "chat.png", "chat": true},
+		# A ballot over the HUD, mid-vote, with the mouse freed and a row hovered: the
+		# state with the most on screen at once — numbers, a hint, counts, a crowded row
+		# that has to squeeze its avatars, one picture avatar among initials, and the local
+		# player's own choice marked.
+		{"id": &"", "file": "ballot.png", "ballot": true},
 	]
 
 
@@ -179,6 +185,46 @@ func _build_hud() -> void:
 	)
 
 
+func _build_ballot() -> void:
+	_ballot = DotBallotPanel.new()
+	_ballot.name = "Ballot"
+	_ballot.position = Vector2(40.0, 120.0)
+	_ballot.local_voter = "u3"
+	_hud.add_child(_ballot)
+
+	# A stand-in picture, generated: dot-ui ships no art, and the point is to see a texture
+	# drawn where an initial would be.
+	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			image.set_pixel(x, y, Color(0.2 + x / 48.0, 0.3, 0.9 - y / 48.0))
+	var picture := ImageTexture.create_from_image(image)
+	_ballot.avatar_fn = func(voter: String, _url: String) -> Texture2D:
+		return picture if voter == "u1" else null
+
+	var voters := {}
+	var people := {}
+	var names := ["gamemann", "bo", "quiet_one", "newcomer", "ana", "zed", "kit", "mo", "lu", "pip", "rex"]
+	var picks := [0, 0, 1, 1, 0, 2, 0, 0, 4, 0, 1]
+	for i in names.size():
+		voters["u%d" % (i + 1)] = picks[i]
+		people["u%d" % (i + 1)] = {"name": names[i], "avatar": "https://example.invalid/%d.png" % i}
+
+	_ballot.show_state({
+		"open": true, "title": "Vote for the next map", "command": "votefor",
+		"seconds": 24.0, "input": "both",
+		"options": [
+			{"id": "atrium", "label": "Atrium", "votes": 6.0},
+			{"id": "foundry", "label": "Foundry (low gravity)", "votes": 3.0},
+			{"id": "reactor", "label": "Reactor", "votes": 1.0},
+			{"id": "yard", "label": "a_very_long_map_name_that_has_to_clip", "votes": 0.0},
+			{"id": "extend", "label": "Extend", "votes": 1.0},
+		],
+		"voters": voters, "people": people,
+	})
+	_ballot.snap_avatars()
+
+
 func _process(_delta: float) -> bool:
 	if _done:
 		return true
@@ -196,6 +242,15 @@ func _process(_delta: float) -> bool:
 			_chat.open(&"team")
 		else:
 			_chat.close()
+
+		if bool(shot.get("ballot", false)):
+			if _ballot == null:
+				_build_ballot()
+			_ballot.visible = true
+			_ballot._set_pointer(true)
+			_ballot._hover = 1
+		elif _ballot != null:
+			_ballot.visible = false
 
 		# An empty id means "show nothing", which is how the HUD gets a frame of its own:
 		# the stack's `hides_below` takes it down under an opaque screen, deliberately.

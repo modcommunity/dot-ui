@@ -178,6 +178,18 @@ Measured in mg-buses-from-hell, whose bowl is pale sand under a low sun: three c
 
 `DotChatWindow.outline_size` passes it through, like `max_lines` and `line_height` before it.
 
+## A ballot on the HUD
+
+`DotBallotPanel`, in `hud/`. Numbered options a player picks with a number key or a click, a countdown, and every voter's avatar sitting on what they chose — sliding to another row when they change their mind. It takes a dictionary (dot-vote's `DotVoteBallotView` state, whatever carried it) and emits `chosen(index, id, command)`; what a choice turns into is the host's. dot-ui still names nothing outside dot-core.
+
+**It touches `Input.mouse_mode`, and that is the one exception to "the stack owns it".** It is not a screen: a ballot is a widget over a live game, not modal, and pushing a screen for it would stop the player moving. Under `pointer` or `both`, `pointer_key` (F3) frees the mouse and the panel restores **the mode it found**, not "captured" — a 2D game or a game in a menu must not have the mouse taken by a ballot closing. A game that recaptures the mouse every frame will fight it; none here does.
+
+**The number keys are consumed in `_input`, and only those.** The chat box's lesson — consuming every key in `_input` starves a focused `LineEdit` — applies, so the panel takes 1-9 and 0 and the pointer key, and nothing at all while a `LineEdit` or `TextEdit` has focus: "gg 1" typed in chat is not a vote. A game that POLLS `Input` for its weapon slots still sees the key, because the engine updates action state before any node hears the event and no Control can take that back; `ballot_input: pointer` is the server's answer for a game whose number keys matter.
+
+**It draws itself.** Avatars travel across rows, and a container would fight every one of them; the rows, the labels and the discs are `_draw`, and the hit test is the same rects. A picture avatar is a textured polygon, because a Control cannot clip one draw call to a circle; a voter with no picture is a disc coloured from their id with their initial on it — golden-ratio hue, because neighbouring ids hash to neighbouring numbers and a plain modulo drew nine people in two colours.
+
+**The first picture found three things no check could:** labels cut mid-word with no ellipsis ("Foundry (low gravit"), every avatar green or pink, and picture avatars drawn square. All three are fixed and `tools/screenshot.sh` draws `ballot.png` — mid-vote, the mouse freed, a row hovered, a crowded row squeezing its avatars, one picture among initials, and the local player's choice marked.
+
 ## `DotInputBinding`: one binding as a short string
 
 `"Y"`, `"Shift+A"`, `"Mouse 1"`, `"Pad 0"`, `"Axis 0+"`. `DotBindingsPanel` stores a whole screen's worth as dictionaries in a file of its own, which is right for a rebinder; a *single* binding that travels in a settings document needs a form a person can read in a JSON file and type by hand, and `{"type":"key","code":89,"physical":true}` is neither.
@@ -248,7 +260,7 @@ done
 godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
-218 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
+243 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
 checks is rendered** — a headless run has no display, and its viewport is 64 × 64 — and
 nothing tested depends on rendering. `DotFeedView.expire()` and `opacity_of()` take an
 explicit millisecond clock so the fade can be tested without waiting out six real

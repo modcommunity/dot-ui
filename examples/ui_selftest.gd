@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 218
+const CHECKS := 243
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 17
+const SECTIONS := 18
 
 var _passed := 0
 var _failed := 0
@@ -111,6 +111,7 @@ func _run() -> void:
 	_test_bindings()
 	_test_input_binding()
 	_test_chat_window()
+	_test_ballot_panel()
 	await _test_settings_screen()
 
 	DotPaths.remove_tree(BINDINGS_FILE)
@@ -1457,6 +1458,143 @@ func _test_input_binding() -> void:
 
 
 # --- The chat window -------------------------------------------------------
+
+func _key(code: Key) -> InputEventKey:
+	var e := InputEventKey.new()
+	e.keycode = code
+	e.pressed = true
+	return e
+
+
+func _ballot_state(input: String, voters: Dictionary = {}) -> Dictionary:
+	return {
+		"open": true, "title": "Vote for the next map", "command": "votefor",
+		"seconds": 20.0, "input": input,
+		"options": [
+			{"id": "a", "label": "Alpha", "votes": 1.0},
+			{"id": "b", "label": "Bravo", "votes": 0.0},
+			{"id": "c", "label": "Charlie\u202e", "votes": 0.0},
+		],
+		"voters": voters,
+		"people": {"u1": {"name": "ana", "avatar": ""}},
+	}
+
+
+func _test_ballot_panel() -> void:
+	print("")
+	_section("ballot panel")
+
+	var panel := DotBallotPanel.new()
+	panel.local_voter = "u9"
+	add_child(panel)
+
+	var picked: Array = []
+	panel.chosen.connect(func(i: int, id: String, cmd: String) -> void: picked.append([i, id, cmd]))
+
+	_check(not panel.visible and not panel.is_open(), "a ballot panel starts hidden")
+
+	panel.show_state(_ballot_state("both", {"u1": 0}))
+	_check(panel.visible and panel.is_open() and panel.option_count() == 3, "a state opens it with its options")
+	_check(panel.size.x > 100.0 and panel.size.y > 100.0, "and it has a size of its own (%s)" % str(panel.size))
+	_check(panel.seconds_left() > 19.0, "and counts the time it was told")
+	_check(
+		panel.row_rect(2).size.y > 0.0 and panel.row_rect(2).position.y > panel.row_rect(0).position.y,
+		"its rows stack downwards"
+	)
+	_check(not str(panel._options[2]["label"]).contains("\u202e"), "a bidi override in a label is stripped")
+
+	panel._input(_key(KEY_2))
+	_check(
+		picked.size() == 1 and picked[0] == [1, "b", "votefor"],
+		"the 2 key chooses the second option, with the command to send", str(picked)
+	)
+	_check(panel.choice_of("u9") == 1, "and the local player's avatar moves at once, before the server answers")
+
+	panel._input(_key(KEY_7))
+	_check(picked.size() == 1, "a number past the last option chooses nothing")
+
+	# The avatar travels.
+	var target := panel.avatar_target("u1")
+	panel._process(0.0)
+	var start := panel.avatar_position("u1")
+	for i in 30:
+		panel._process(1.0 / 30.0)
+	var after := panel.avatar_position("u1")
+	_check(
+		start.distance_to(target) > 1.0 and after.distance_to(target) < start.distance_to(target) * 0.1,
+		"a vote's avatar slides from the heading onto its row", "%s -> %s, target %s" % [start, after, target]
+	)
+	_check(
+		panel.row_rect(0).has_point(target),
+		"and the row it lands on is the option voted for"
+	)
+
+	panel.show_state(_ballot_state("both", {"u1": 2}))
+	_check(
+		panel.row_rect(2).has_point(panel.avatar_target("u1")) and panel.row_rect(0).has_point(panel.avatar_position("u1")),
+		"a changed vote moves the avatar from where it was, rather than teleporting it"
+	)
+	panel.snap_avatars()
+	_check(panel.row_rect(2).has_point(panel.avatar_position("u1")), "and a late joiner sees every avatar already in place")
+
+	panel.show_state(_ballot_state("both", {}))
+	_check(panel.avatar_position("u1") == Vector2(-1, -1), "a voter the server no longer has leaves the board")
+
+	# Pointer mode.
+	var mouse_before := Input.mouse_mode
+	panel._input(_key(panel.pointer_key))
+	_check(panel.is_pointer_mode() and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE, "the pointer key frees the mouse")
+	panel._input(_key(panel.pointer_key))
+	_check(not panel.is_pointer_mode() and Input.mouse_mode == mouse_before, "and again puts it back the way it was found")
+
+	# Numbers only, pointer only.
+	panel.show_state(_ballot_state("numbers"))
+	panel._input(_key(panel.pointer_key))
+	_check(not panel.is_pointer_mode(), "under numbers the pointer key does nothing")
+
+	panel.show_state(_ballot_state("pointer"))
+	picked.clear()
+	panel._input(_key(KEY_1))
+	_check(picked.is_empty(), "under pointer the number keys are left to the game")
+	panel._input(_key(panel.pointer_key))
+	_check(panel.is_pointer_mode(), "and the pointer key frees the mouse")
+
+	panel.take_numbers = false
+	panel.show_state(_ballot_state("both"))
+	panel._input(_key(KEY_1))
+	_check(picked.is_empty(), "a panel told not to take the numbers does not, for the other ballot on screen")
+	panel.take_numbers = true
+
+	# Typing is not voting.
+	var line := LineEdit.new()
+	add_child(line)
+	line.grab_focus()
+	panel._input(_key(KEY_1))
+	_check(picked.is_empty(), "a 1 typed into a text field is not a vote")
+	line.queue_free()
+	line.release_focus()
+
+	# Closed.
+	var gone := [false]
+	panel.dismissed.connect(func() -> void: gone[0] = true)
+	panel.result_hold_sec = 0.5
+	panel.show_state({"open": false, "winner": "Bravo"})
+	_check(
+		panel.visible and not panel.is_open() and not panel.is_pointer_mode() and Input.mouse_mode == mouse_before,
+		"closing shows the result, and gives the mouse back"
+	)
+	_check("Bravo won" in "\n".join(panel.describe_lines()), "and says what won")
+	panel._result_until_ms = Time.get_ticks_msec() - 1
+	panel._process(0.0)
+	_check(not panel.visible and gone[0], "then goes away on its own")
+
+	panel.show_state(_ballot_state("both"))
+	panel.show_state({"open": false})
+	_check(not panel.visible, "a close with no result takes it down at once")
+
+	panel.queue_free()
+	_done()
+
 
 func _test_chat_window() -> void:
 	print("")

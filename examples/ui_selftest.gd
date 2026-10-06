@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 243
+const CHECKS := 248
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 18
+const SECTIONS := 19
 
 var _passed := 0
 var _failed := 0
@@ -113,6 +113,7 @@ func _run() -> void:
 	_test_chat_window()
 	_test_ballot_panel()
 	await _test_settings_screen()
+	await _test_scoreboard_screen()
 
 	DotPaths.remove_tree(BINDINGS_FILE)
 
@@ -142,6 +143,45 @@ func _run() -> void:
 
 
 # --- Assertions ------------------------------------------------------------
+
+## The shared scoreboard: the game's rows and columns, an icon column, a title.
+func _test_scoreboard_screen() -> void:
+	_section("scoreboard screen")
+
+	var stack := DotScreenStack.new()
+	add_child(stack)
+	var board := DotScoreboardScreen.new()
+	board.title_text = "Course 3"
+	var avatar := GradientTexture2D.new()
+	board.columns = [
+		{"key": &"avatar", "kind": &"icon", "width": 0.0, "size": 20.0},
+		{"key": &"name", "title": "Player", "width": 3.0},
+		{"key": &"points", "title": "Points", "align": HORIZONTAL_ALIGNMENT_RIGHT},
+		{"key": &"ping", "title": "Ping", "align": HORIZONTAL_ALIGNMENT_RIGHT},
+	]
+	var rows := [
+		{&"avatar": avatar, &"name": "Ada", &"points": 30, &"ping": 41, "highlight": true},
+		{&"avatar": null, &"name": "Bo", &"points": 10, &"ping": 77},
+	]
+	board.row_fn = func() -> Array: return rows
+	stack.register(board)
+	var pushed := stack.push(&"scoreboard")
+	await get_tree().process_frame
+
+	_check(pushed.ok and stack.top_id() == &"scoreboard", "a game registers it and pushes it by its id")
+	_check(not board.blocks_input, "and it does not stop the player moving")
+	_check(board.table.row_count() == 2 and board._title.text == "Course 3",
+		"it shows the game's rows under the game's title")
+	var first_row := board.table._grid.get_child(1)
+	_check(first_row.get_child(0) is TextureRect and (first_row.get_child(0) as TextureRect).texture == avatar,
+		"an icon column draws the row's picture")
+	var second_row := board.table._grid.get_child(2)
+	_check(second_row.get_child(0) is TextureRect and (second_row.get_child(0) as TextureRect).texture == null,
+		"and a player with none keeps the column's width")
+
+	stack.queue_free()
+	_done()
+
 
 func _section(title: String) -> void:
 	_entered += 1

@@ -142,7 +142,10 @@ func _rebuild() -> void:
 
 		for column in columns:
 			var key := StringName(str(column.get("key", "")))
-			line.add_child(_make_cell(str(row.get(key, "")), colour, column))
+			if StringName(str(column.get("kind", ""))) == &"icon":
+				line.add_child(_make_icon(row.get(key, null), column))
+			else:
+				line.add_child(_make_cell(str(row.get(key, "")), colour, column))
 
 		_grid.add_child(line)
 
@@ -151,6 +154,21 @@ func _make_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(column_gap))
 	return row
+
+
+## A picture cell, for a column with `"kind": &"icon"`: an avatar beside a name. The row's
+## value is a [Texture2D], or anything else for an empty square the same size, so a player
+## with no picture does not shift the columns after them.
+func _make_icon(value: Variant, column: Dictionary) -> Control:
+	var side := float(column.get("size", 24.0))
+	var icon := TextureRect.new()
+	icon.custom_minimum_size = Vector2(side, side)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	if value is Texture2D:
+		icon.texture = value
+	return icon
 
 
 func _make_cell(text: String, colour: Color, column: Dictionary) -> Label:

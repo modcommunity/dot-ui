@@ -260,7 +260,7 @@ done
 godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
-243 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
+248 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
 checks is rendered** — a headless run has no display, and its viewport is 64 × 64 — and
 nothing tested depends on rendering. `DotFeedView.expire()` and `opacity_of()` take an
 explicit millisecond clock so the fade can be tested without waiting out six real
@@ -297,3 +297,7 @@ screen on a stack whose parent is a plain `Node`.
 - **Touch controls.** dot-player-controller ships `DotFpsTouchSampler`, which turns
   fingers into commands and deliberately ships no layout. The on-screen buttons that
   drive it are a game's design, and `DotScreen` is enough to build them on.
+
+## The scoreboard every game asked for (2026-10-06)
+
+`DotScoreboardScreen` is the Tab screen, shared: a title and a ranked `DotTableView`, with the **rows and the columns the game's** (`row_fn`, `columns`), because a deathmatch counts kills, an obstacle course points and an eating game mass. Transparent and non-blocking, like game-arena's own `ScoreboardScreen`, which predates it and still stands. `DotTableView` gained an icon column (`"kind": &"icon"`, a `Texture2D` per row) for an avatar beside a name; a row with no picture keeps the column's width, so the columns after it do not shift. `ui_selftest`'s *scoreboard screen* (5 checks).

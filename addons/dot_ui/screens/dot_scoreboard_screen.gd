@@ -60,13 +60,22 @@ func _build() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.offset_left = -380.0
 	panel.offset_right = 380.0
-	panel.offset_top = -230.0
-	panel.offset_bottom = 230.0
+	# Below the top of the screen's middle, where a HUD keeps its clock and its titles: the
+	# first render (mg-wipeout) put this title on top of the course's name.
+	panel.offset_top = -170.0
+	panel.offset_bottom = 260.0
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(panel)
 
+	# A margin inside the panel: a right-aligned last column ran to the panel's edge and its
+	# header was clipped ("Pin" in the same render).
+	var margin := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 14)
+	panel.add_child(margin)
+
 	var column := VBoxContainer.new()
-	panel.add_child(column)
+	margin.add_child(column)
 
 	_title = Label.new()
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

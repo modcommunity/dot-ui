@@ -464,11 +464,15 @@ func _draw() -> void:
 	draw_style_box(box, Rect2(Vector2.ZERO, size))
 
 	var heading_y := pad + float(t.heading_size)
-	draw_string(font, Vector2(pad, heading_y), _title, HORIZONTAL_ALIGNMENT_LEFT, panel_width - pad * 2.0 - 60.0, t.heading_size, t.text)
+	var left := int(ceil(seconds_left()))
+	var clock := "%d:%02d" % [left / 60, left % 60] if _open else ""
+	var clock_w := font.get_string_size(clock, HORIZONTAL_ALIGNMENT_LEFT, -1, t.heading_size).x if _open else 0.0
+	var title_w := panel_width - pad * 2.0 - (clock_w + 12.0 if _open else 0.0)
+	var title_size := _heading_size_for(font, _title, title_w, t.heading_size, fs)
+	draw_string(font, Vector2(pad, heading_y), _fit(font, _title, title_w, title_size), HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, t.text)
 
 	if _open:
-		var left := int(ceil(seconds_left()))
-		draw_string(font, Vector2(pad, heading_y), "%d:%02d" % [left / 60, left % 60], HORIZONTAL_ALIGNMENT_RIGHT, panel_width - pad * 2.0, t.heading_size, t.danger if left <= 5 else t.accent)
+		draw_string(font, Vector2(pad, heading_y), clock, HORIZONTAL_ALIGNMENT_RIGHT, panel_width - pad * 2.0, t.heading_size, t.danger if left <= 5 else t.accent)
 		draw_string(font, Vector2(pad, heading_y + fs + 8.0), _hint(), HORIZONTAL_ALIGNMENT_LEFT, panel_width - pad * 2.0, fs - 2, t.text_dim)
 	elif _winner != "":
 		draw_string(font, Vector2(pad, heading_y + fs + 8.0), "%s won" % _winner, HORIZONTAL_ALIGNMENT_LEFT, panel_width - pad * 2.0, fs, t.good)
@@ -519,6 +523,20 @@ func _strip_left(index: int) -> float:
 	var right := rect.end.x - 34.0 - avatar_size * 0.5
 
 	return right - step * maxf(float(count) - 1.0, 0.0) - avatar_size * 0.5 if count > 0 else rect.end.x - 34.0
+
+
+## The heading's size: its own if the title fits, smaller down to [param floor_px] if not.
+##
+## The title used to be clipped at a fixed width with no ellipsis, and the server's own
+## titles did not fit beside the clock: "Vote for the next ma". A title is a sentence, so
+## it shrinks a little before it loses a word; [method _fit] cuts what still does not fit.
+static func _heading_size_for(font: Font, text: String, width: float, size_px: int, floor_px: int) -> int:
+	var px := size_px
+
+	while px > floor_px and font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > width:
+		px -= 1
+
+	return px
 
 
 static func _fit(font: Font, text: String, width: float, size_px: int) -> String:

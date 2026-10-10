@@ -1,303 +1,81 @@
 # dot-ui
 
-Screens, HUD and menus. Read `../../CLAUDE.md` first for the family-wide rules; this
-file is only what is specific to the interface.
+Screens, HUD and menus with no art assets: a screen stack that owns z-order, input, mouse mode and pause; pause, settings and scoreboard screens; a settings panel and a rebinder; HUD widgets (stat bar, crosshair, feed, table, chat box, ballot); and a theme generated from a palette.
 
-## The one idea
+Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to the interface. The reasoning is in [docs/](docs/README.md). dot-menu builds the designed Escape menu and Tab scoreboard on top of this.
 
-**Z-order, input blocking, mouse mode and pause are derived in one place, from one
-stack.**
+**Depends on dot-core and nothing else, and names nothing outside it.** Widgets take strings, dictionaries and `Callable`s; a settings source is an untyped `Object`. A script that so much as mentions another addon's class fails to compile without it. [hud](docs/hud.md#ships-no-art-names-nothing-outside-dot-core)
 
-Each is easy alone. Collectively they are where UI bugs live: a menu that renders under
-the HUD, a scoreboard that captures the mouse, an escape key that closes two screens,
-a settings panel that blocks input to a pause menu it is supposed to sit on top of.
-`DotScreenStack._refresh()` recomputes all four from `_stack` every time it changes,
-and nothing else in the addon touches `Input.mouse_mode`, `mouse_filter`, `visible` or
-`move_child` for a screen.
+## Read before
 
-The two flags that look like one and are not:
-
-- `blocks_input` — a scoreboard held down over a live game is *visible* and must not
-  stop the player moving.
-- `hides_below` — a settings panel over a pause menu blocks input and should still let
-  the menu show through.
-
-## Ships no art, imports nothing
-
-`DotUiTheme` generates a whole `Theme` from `StyleBoxFlat`s and a palette. An addon
-that shipped textures would impose its art on every game that installed it, and the
-first thing anyone does is replace it. A game with a designed theme assigns one and
-`DotUiTheme` is never used; a game that wants to ship today gets something legible.
-
-`build()` returns a **fresh** `Theme` every call. A `Theme` is mutable and shared, so
-handing out one instance means a game that tweaks one window tweaks both.
-
-The same rule applies to types: dot-ui names nothing outside dot-core.
-
-- `DotFeedView.add_kill` takes strings and colours, not a `DotKillFeed.Entry`.
-- `DotTableView` takes columns and rows of dictionaries, not a `DotScoreboard`.
-- `DotStatBar` and `DotCrosshair` take `Callable`s, not a `DotHealth` or a
-  `DotWeaponBallistics`.
-
-`DotTableView.scoreboard_columns()` is the one concession: the standard columns as
-data, so a game does not reinvent them, without dot-ui knowing what fills them.
-
-## Open screens are moved to the *end* of the child list
-
-`_refresh` moves each open screen to `get_child_count() - 1`, bottom of the stack
-first — not to its stack index.
-
-A closed screen is still a child of the stack. Indexing from zero leaves closed screens
-*after* open ones in sibling order; they are invisible so nothing draws wrongly today,
-but any other child a host adds under the stack would render above every open screen.
-The self-test asserts the top screen is the last sibling, and it caught exactly this.
-
-## Pushing what is already open raises it
-
-Almost always a double-fired input rather than an intention. Stacking a second copy
-gives a menu that takes two escapes to close, and the player has no idea why.
-
-Popping from the *middle* of the stack is allowed rather than refused, for the opposite
-reason: a screen closing itself in response to a game event does not know what has been
-opened over it, and refusing would leave a dead screen in the stack forever.
-
-## A screen that refuses to close still consumes the key
-
-If `_can_pop()` returns false, `_unhandled_input` marks the event handled anyway.
-Otherwise the escape key both fails to close the menu *and* falls through to gameplay,
-opening the one below it.
-
-`pop_to()` stops at a screen that refuses rather than looping — a bounded walk, not a
-`while not empty`.
-
-**Use `_can_pop` sparingly.** A screen a player can be trapped in is indistinguishable
-from a bug.
-
-## `allow_pause` defaults to off
-
-Pausing the tree pauses only the *local* simulation, which desynchronises it from a
-server that carried on. A menu that pauses is a single-player feature that looks like a
-general one, and turning it on in a multiplayer game is a client that drifts every time
-someone opens the settings.
-
-## Widgets pull, and the throttle is the point
-
-A widget wired to a signal misses the change that happened before it was created and
-fires four times when four things change in one tick. `DotHudWidget` holds a
-`Callable` and re-reads on a throttle.
-
-Without the throttle a HUD re-lays-out text at frame rate to show a number that changes
-twice a second. `refresh_on_change` is the escape hatch for anything where lateness is
-a lie rather than a delay — health during a burst, ammo mid-magazine.
-
-`DotStatBar` eases the *bar* and never the *number*. Lag on a bar is a readability
-feature: a hit that takes a third of your health is legible as a slide and invisible as
-a jump. Lag on the number is a lie about the current value. The easing is exponential,
-not linear — a linear catch-up takes as long for a one-point change as a hundred-point
-one, which reads as a bar that is broken for small hits.
-
-## The crosshair does the real projection
-
-`gap_pixels()` = `base_gap + (viewport_height/2 / tan(fov/2)) * tan(spread)`.
-
-A crosshair that opens by an arbitrary factor is *worse* than a fixed one: it tells the
-player something confident and wrong. And `fov_degrees` is exported because a crosshair
-that assumes 90 is wrong at every other setting — which is most of them.
-
-`suppressed`, not `hidden`: `Control` already has a `hidden` and redefining it is a
-parse error. It is also not `visible`, deliberately — a scoped crosshair keeps
-refreshing so a game reading `gap_pixels()` for a scope reticle still gets an answer.
-
-## `DotSettingsPanel` must never show a secret
-
-`sensitive_keys()` is honoured and `show_sensitive` defaults to off. Same reason
-`DotConfig` refuses secrets from the environment and argv: both end up in `ps` output,
-screenshots and pasted bug reports.
-
-Two other things it gets right that a naive version does not:
-
-- **Group headings are added lazily**, once a group turns out to have something visible
-  in it. Adding them up front leaves a bare "Storage" heading over nothing whenever a
-  group holds only secrets.
-- **Text is committed on submit and focus-out, not on `text_changed`.** With `live` on,
-  per-keystroke would be a `validate()` per character typed.
-
-`apply()` **rolls back every edit** on a validation failure. Applying half of an invalid
-set leaves the config in a state nobody chose.
-
-## `DotBindingsPanel`: three things a naive rebinder gets wrong
-
-1. **An action left bound to nothing.** `load_saved` resets any action a file leaves
-   with no events back to its default. A truncated, hand-edited or older-build file
-   otherwise leaves the player with a control they cannot use and cannot reach the
-   rebinder for.
-2. **Conflicts detected after committing.** `bind_action` checks first, so a refusal is
-   a no-op rather than something the caller undoes.
-3. **Escape binding itself.** During capture, escape cancels. Without it, a player who
-   opens the capture by accident binds escape to something and can no longer leave any
-   menu.
-
-Comparison is by **physical keycode**, which is what makes a binding survive a layout
-change — mixing physical and logical makes a French player's `A` conflict with an
-English player's `Q`.
-
-An absent `bindings` key in the file is a **failure**; a present-but-empty one is a
-player who unbound everything. Treating the first as "change nothing" silently accepts
-a file written by a different tool.
-
-`ui_*` actions are hidden by default: they are the engine's navigation, and rebinding
-them from a settings screen breaks the settings screen.
-
-## The chat box four games did not have
-
-`DotChatWindow`, in `hud/`. A log that fades, a line to type in, and a key that opens it.
-
-**It is here rather than in dot-chat for the reason `DotFeedView` is here.** dot-chat is the decision layer — who hears a line, what it may contain, what name is drawn beside it — and it ships no art on purpose. What happened next is what always happens: four clients in this family could *receive* a chat line and could not *send* one. game-arena's own note called that "a level of ambition rather than an oversight" on the grounds that a scrolling window with an input field is a `DotScreen`. It is not: a screen is modal and takes the whole display, and a chat box is eight lines in a corner that has to leave the game visible behind it. That is a HUD widget.
-
-So this knows nothing about chat. It takes coloured fragments to draw and emits the string somebody typed; a game hands `submitted` to whatever its send path already is and feeds arriving lines back through `add_message`. dot-ui still depends on dot-core and nothing else.
-
-**The open key is an action, not a key.** `open_action` names an `InputMap` action so the binding is the player's — rebindable through `DotBindingsPanel`, or stored in a settings document as text through `DotInputBinding`. `KEY_Y` hardcoded is a key nobody can move, on a keyboard whose Y is somewhere else.
-
-### Three bugs in it, and a picture found all three
-
-- **Consuming keys in `_input` starved the line edit of the keys being typed.** Godot delivers an event to `_input`, *then* to the focused control, then to shortcut and unhandled input. The first draft consumed every key in `_input` to keep them away from the game, which is a chat box nobody can type in. What actually keeps keys out of a game is the focused `LineEdit` itself; what this adds is `gui_input` on the entry, ahead of it, for escape, recall and the channel cycle.
-- **`anchor_right = 1.0` on a fresh `Control` leaves it nought pixels wide.** The setter *recomputes the offsets to preserve the control's current rectangle*, and a control built in code has no rectangle yet — so the log drew nothing while every property about it read correctly. This family has now paid for that trap seven times; every offset here is set explicitly, and all four of them after the anchors.
-- **A line put in before `_ready` vanished.** A host that builds the box and immediately announces something — or builds it in `SceneTree._initialize`, where *nothing* is inside the tree and no `_ready` has run — was writing into a log that did not exist. The pieces are built on demand now, and `ui_selftest` asserts a line added before the node is readied survives.
-
-**And the log wraps, which `DotFeedView` does not.** A feed entry is two names and a weapon; a chat line is up to the server's 127 characters, and unwrapped it runs out of the box and across the middle of the screen. `DotChatWindow._wrap` splits at word boundaries, keeping each fragment's colour, so a wrap inside what somebody said does not take the speaker's colour with it. It wraps rather than truncating: chat is the one place where the text *is* the content.
-
-`max_lines` bounds **rows**, not messages, and the box's height is derived from it — two numbers for one thing is two numbers that disagree, and the way they disagree is a log drawn through the field somebody is typing in. The log is anchored to the bottom and resized as lines arrive, so the newest line is always against the entry.
-
-`margin_left` and `margin_bottom` are separate because the thing in the way is never in both directions: game-arena has health and armour in that corner and needs the box lifted above them and still flush with the same left edge.
-
-### A feed drawn over a bright map is a feed nobody can read
-
-`DotFeedView.outline_size`, off by default and therefore no change to anything that already draws one. Everything this addon draws goes over a *game*, and a game is not one colour: white text disappears over pale ground in bright light, black text disappears over a dark map, and a panel behind the text fixes both by covering a rectangle of the thing the player is trying to see — which on a widget that exists to be glanced at is the wrong trade.
-
-Measured in mg-buses-from-hell, whose bowl is pale sand under a low sun: three chat lines in three different colours, all of them unreadable, in a rendered frame where every property of every line was correct and no assertion anywhere could have said so. That game's own HUD labels had already solved it the same way, independently, months earlier — **which is the argument for the option being here**: two solutions to one problem, one of them in a game, is the shape every other extraction in this file started from.
-
-`DotChatWindow.outline_size` passes it through, like `max_lines` and `line_height` before it.
-
-## A ballot on the HUD
-
-`DotBallotPanel`, in `hud/`. Numbered options a player picks with a number key or a click, a countdown, and every voter's avatar sitting on what they chose — sliding to another row when they change their mind. It takes a dictionary (dot-vote's `DotVoteBallotView` state, whatever carried it) and emits `chosen(index, id, command)`; what a choice turns into is the host's. dot-ui still names nothing outside dot-core.
-
-**It touches `Input.mouse_mode`, and that is the one exception to "the stack owns it".** It is not a screen: a ballot is a widget over a live game, not modal, and pushing a screen for it would stop the player moving. Under `pointer` or `both`, `pointer_key` (F3) frees the mouse and the panel restores **the mode it found**, not "captured" — a 2D game or a game in a menu must not have the mouse taken by a ballot closing. A game that recaptures the mouse every frame will fight it; none here does.
-
-**The number keys are consumed in `_input`, and only those.** The chat box's lesson — consuming every key in `_input` starves a focused `LineEdit` — applies, so the panel takes 1-9 and 0 and the pointer key, and nothing at all while a `LineEdit` or `TextEdit` has focus: "gg 1" typed in chat is not a vote. A game that POLLS `Input` for its weapon slots still sees the key, because the engine updates action state before any node hears the event and no Control can take that back; `ballot_input: pointer` is the server's answer for a game whose number keys matter.
-
-**It draws itself.** Avatars travel across rows, and a container would fight every one of them; the rows, the labels and the discs are `_draw`, and the hit test is the same rects. A picture avatar is a textured polygon, because a Control cannot clip one draw call to a circle; a voter with no picture is a disc coloured from their id with their initial on it — golden-ratio hue, because neighbouring ids hash to neighbouring numbers and a plain modulo drew nine people in two colours.
-
-**The first picture found three things no check could:** labels cut mid-word with no ellipsis ("Foundry (low gravit"), every avatar green or pink, and picture avatars drawn square. All three are fixed and `tools/screenshot.sh` draws `ballot.png` — mid-vote, the mouse freed, a row hovered, a crowded row squeezing its avatars, one picture among initials, and the local player's choice marked.
-
-## `DotInputBinding`: one binding as a short string
-
-`"Y"`, `"Shift+A"`, `"Mouse 1"`, `"Pad 0"`, `"Axis 0+"`. `DotBindingsPanel` stores a whole screen's worth as dictionaries in a file of its own, which is right for a rebinder; a *single* binding that travels in a settings document needs a form a person can read in a JSON file and type by hand, and `{"type":"key","code":89,"physical":true}` is neither.
-
-The vocabulary is deliberately the one `DotBindingsPanel.event_name` already draws on a button. Two spellings of one binding is a settings file that disagrees with the rebinding screen.
-
-**Keys are physical.** A binding stored as a keycode is stored in the player's current layout, and the same file on an AZERTY keyboard binds a key that is not where the label says.
-
-**`apply` replaces rather than adds.** `InputMap.action_add_event` on an action that already has one leaves *both* bound — a rebound key that still answers to its old one, invisible until somebody rebinds crouch onto their forward key and both fire. `ensure_action` is the boot path and never overwrites what a player chose.
-
-## Two screens every game was writing for itself
-
-`DotPauseScreen` and `DotSettingsScreen`, in `screens/`. Four clients in this family had independently written the same forty lines — a centred `PanelContainer`, a heading, a column of `Button`s, a focus path — and differed only in which words were on the buttons and which document the panel was bound to. Two copies of one thing is this tree's most expensive mistake; four is that mistake with a number on it.
-
-**And for a while this paragraph was wrong about three of the four.** Writing the screens is not adopting them: game-playground moved onto both, game-arena moved onto `DotSettingsScreen` only, and every one of the other five hand-written copies stayed exactly where it was — so the sentence above described work that had been *made possible* rather than work that had been done. All four are on both now. The general shape is worth naming because it is invisible from inside the addon: **an extraction is finished when the last caller moves, and nothing in the extracted repository can tell you whether that happened.** The grep is `grep -rn 'extends DotScreen'` over the games, against the list of screens this addon ships.
-
-**The settings source is an `Object` and is never named.** dot-ui depends on dot-core and nothing else, and a script that so much as *mentions* `DotSettingsManager` fails to compile in a project without dot-settings — which is most of them. The contract is two methods, `to_config()` and `absorb_config()`, and that the screen also accepts a bare `DotConfig` is the proof the seam is real. Same shape as dot-chat's backbone client.
-
-**The two-step apply is the whole reason the screen exists.** `to_config()` hands out a *snapshot*: writing to it does not write to the manager. A screen that called only `DotSettingsPanel.apply()` would report success and change nothing, for ever — and every structural check about it passes either way. It builds, it has a size, it has focus, the panel has editors. Only a check that edits a value, presses Apply and then reads the **manager** can tell the two apart.
-
-**A pause menu's button ids are derived from its labels**, never paired with them. `"Rock the vote"` is `&"rock_the_vote"`. A list of labels and a parallel list of ids is two lists that can disagree, and this tree has paid for that shape more than any other.
-
-**`id_override`, not `screen_id`.** `DotScreen` already has a `screen_id()` method and a property cannot shadow one — GDScript refuses it with *"Could not resolve external class member"*, reported against the file that **uses** the property rather than the one that declares it, with `--check-only` on the declaring file saying nothing. The scene then hangs rather than failing. It is configurable at all because a game legitimately has two of these: the player's settings and the interface's own `DotUiConfig` are different documents, and a stack registers by id.
-
-## The addon that draws had no picture of anything
-
-`tools/screenshot.sh` renders `DotPauseScreen` and `DotSettingsScreen` to `screenshots/` through `xvfb-run`. It found two bugs on its first run, and neither was reachable from any assertion:
-
-**The pause menu drew nothing at all.** `DotScreen._screen_id()` defaults to `StringName(name)` — the NODE NAME — so a screen called `Pause` registered as `&"Pause"` and `push(&"pause")` answered "no such screen". That is reported and nothing treats it as fatal, so the menu simply never opened. **Every structural check passed**, in this suite and in game-playground's, because a *registered* screen is sized and focusable whether or not it is on screen: the size check, the focus-path check and the button check were all asserting a screen that was not there. `DotPauseScreen` declares `id_override` now, and both suites assert `stack.top_id()` after the push — which is the check that was missing.
-
-**The settings panel grew past the bottom of the window**, taking Apply, Revert and Back with it: a settings screen a player can read and cannot save from or leave. A `DotSettingsPanel` is as tall as the document it was handed and `DotUiConfig` alone comes out around 600 pixels. The rows are in a `ScrollContainer` now and the buttons sit below it.
-
-### Three assertions were tried against that second one and none of them could fail
-
-| tried | why it passed with the bug in place |
+| Read | Before |
 | --- | --- |
-| Apply is inside the panel | a `PanelContainer` **grows** to fit, so the button stays inside a panel that has itself left the window |
-| Apply is inside the screen | **a headless viewport is 64 × 64**, so every screen in this suite is 64 × 64 and nothing measured against one means anything |
-| a long and a short document give the same-sized panel | at 64 × 64 the layout resolves the same either way |
+| [docs/README.md](docs/README.md) | the index |
+| [docs/screens.md](docs/screens.md) | the stack, screen ids, pause, the shared screens, the settings and bindings panels, `DotInputBinding` |
+| [docs/hud.md](docs/hud.md) | the theme, widgets, crosshair, table, chat box, ballot, what is deliberately not here |
+| [docs/testing.md](docs/testing.md) | adding a check, or believing one; the screenshots |
+| [docs/history.md](docs/history.md) | the bugs, and how each looked |
 
-Each was armed by replacing the `ScrollContainer` with a plain box and re-running. None fired. What ships is the **structure plus the reason** — the panel is inside a scroll, the buttons are outside it — which does fire, and the real guard is the screenshot.
+## Layout
 
-### And pointing one at a game's own screens found three more
+| Path | What |
+| --- | --- |
+| `addons/dot_ui/core/` | `DotScreen`, `DotScreenStack`, `DotUiTheme`, `DotInputBinding` |
+| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield` |
+| `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
+| `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen` |
+| `addons/dot_ui/dot_ui_config.gd` | `DotUiConfig`, the interface's own settings document |
+| `examples/ui_selftest.tscn` | the suite, offline |
+| `tools/screenshot.sh` | renders pause, settings, HUD, chat and ballot frames to `screenshots/` through `xvfb-run` |
 
-`game-arena/tools/screenshot_menus.sh` renders that game's pause, controls and scoreboard — the screens this addon does not own. Two of the three bugs were in **this addon**:
+## Running and testing
 
-- **`DotTableView`: an absent column `width` collapsed the column to nothing.** It meant `SIZE_FILL`, which reads as "take your content's width" and is not, because `clip_text` sets a `Label`'s minimum size to zero. `scoreboard_columns()` gives a width only to `name` — so **every scoreboard and every server browser in this family drew one column**, with the data correct and `describe()` agreeing. An absent width is an equal share now; zero means "shrink to the content" and turns `clip_text` off with it.
-- **`DotTableView` honoured no column width at all, ever.** It used a `GridContainer`, which gives every column the SAME width whatever ratio a cell asks for — `size_flags_stretch_ratio` is read by a `BoxContainer` and by nothing else. Measured: four columns declaring 0.4, 3.0, 1.0 and 1.0 came out **308 pixels each**. `width` was documented here, set to 3.0 for the name column in `scoreboard_columns()`, copied into four games' lists, and inert in all of them — which is why long player names were clipped in a table with empty space in it. It is a `VBoxContainer` of `HBoxContainer`s now; the columns still line up across rows because every row is built from the same ratios at the same width. **The first fix made this visible rather than fixing it**: with the columns collapsed to nothing, nobody could see that the widths they came back at were equal. A second picture of the corrected screen is what found it.
-- **`DotBindingsPanel.rebindable_actions()` said "sorted" and was not.** `out.sort()` on an `Array[StringName]` compares **interned pointers** — the same trap that gave two peers two different wire ids for one message type in dot-net. The rebinder listed Noclip, Walk, Sprint, Crouch, Jump, Back, Forward, Right, Left, in an order that is not stable between builds either. Sorted as Strings now, and the label drops the `prefix`, which is the part that is not information.
+- Link `addons/dot_core` once ([development setup](../../docs/development-setup.md)), then the family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)) and `godot --headless --path . res://examples/ui_selftest.tscn`.
+- **Every visual change wants `tools/screenshot.sh` run and the frame looked at.** A headless viewport is 64 × 64, so no assertion can say anything about layout relative to the window; most of this addon's bugs were found by a picture. [testing](docs/testing.md#what-a-headless-suite-cannot-see)
+- Measure a size in a check, never a property. Pick fixtures that put a widget in the state its options exist for. [testing](docs/testing.md)
 
-### The HUD too, which nothing had ever looked at
+## Rules that bite
 
-`screenshot.sh` draws a third frame: a `DotStatBar` pair, a `DotCrosshair` and a `DotFeedView` with names of the length a real one has. Every check about those is a number or a property — the bar's eased value, the crosshair's computed gap, the feed's opacity at a given millisecond — all correct, and none of them says whether the thing is legible.
+**The stack**
 
-It found no bug, and one thing worth keeping anyway: **a fixture picked at random misses the state worth seeing.** Health at 28% draws in the ordinary colour, because `low_fraction` is 0.25 — and a bar that never goes below the threshold looks exactly like one whose `low_colour` does not work. The fixture is 18 now, and the picture shows red.
+- Only `DotScreenStack._refresh()` touches `Input.mouse_mode`, `mouse_filter`, `visible` or `move_child` for a screen. `DotBallotPanel` is the one widget exception, and restores the mode it found. [screens](docs/screens.md#the-one-idea)
+- `blocks_input` and `hides_below` are different flags. [screens](docs/screens.md#the-one-idea)
+- Open screens go to the end of the child list, bottom first. [screens](docs/screens.md#open-screens-are-moved-to-the-end-of-the-child-list)
+- Pushing an open screen raises it; popping from the middle is allowed. [screens](docs/screens.md#pushing-what-is-already-open-raises-it)
+- A screen refusing `_can_pop` still consumes the key; use it sparingly. [screens](docs/screens.md#a-screen-that-refuses-to-close-still-consumes-the-key)
+- A screen's id defaults to its NODE NAME; set one, and assert `stack.top_id()` after a push. A property named like a `DotScreen` method (`screen_id`) breaks the *using* file and hangs the scene: it is `id_override`. [screens](docs/screens.md#a-screens-id)
+- `allow_pause` defaults to off: pausing desyncs a networked client. [screens](docs/screens.md#allow_pause-defaults-to-off)
 
-That 64 × 64 is worth carrying away on its own: **no assertion in any headless suite in this family can say anything about layout relative to the window.** `size.y > 0` passes at 64 as happily as at 800.
+**Panels and screens**
 
-## Validating changes
+- `DotSettingsScreen` applies in two steps (panel into the snapshot, snapshot into the source via `absorb_config`); a check must read the manager after Apply. [screens](docs/screens.md#the-pause-and-settings-screens)
+- Pause button ids are derived from labels, never a parallel list. [screens](docs/screens.md#the-pause-and-settings-screens)
+- `DotSettingsPanel` never shows a secret (`show_sensitive` off), commits text on submit/focus-out, and rolls back every edit on a failed `apply()`. [screens](docs/screens.md#dotsettingspanel-must-never-show-a-secret)
+- Bindings compare by physical keycode; an action left with no events resets to default; escape cancels capture; an absent `bindings` key is a failure; `ui_*` hidden. Sort `StringName`s as Strings. [screens](docs/screens.md#dotbindingspanel-three-things-a-naive-rebinder-gets-wrong)
+- `DotInputBinding.apply` replaces, never adds; `ensure_action` never overwrites a player's choice; its vocabulary is `event_name`'s. [screens](docs/screens.md#dotinputbinding-one-binding-as-a-short-string)
 
-```bash
-cd godot/dot-ui
-ln -s ../../dot-core/addons/dot_core addons/dot_core   # gitignored
-godot --headless --path . --import
-find . -name '*.gd' -not -path './.godot/*' | while read f; do
-    godot --headless --path . --check-only --script "res://${f#./}"
-done
-godot --headless --path . res://examples/ui_selftest.tscn
-```
+**Widgets**
 
-248 checks, all offline, plus `tools/screenshot.sh` which is not. **Nothing the suite
-checks is rendered** — a headless run has no display, and its viewport is 64 × 64 — and
-nothing tested depends on rendering. `DotFeedView.expire()` and `opacity_of()` take an
-explicit millisecond clock so the fade can be tested without waiting out six real
-seconds.
+- `DotUiTheme.build()` returns a fresh `Theme` every call. [hud](docs/hud.md#ships-no-art-names-nothing-outside-dot-core)
+- Widgets pull on a throttle; `refresh_on_change` where lateness is a lie. A stat bar eases the bar, never the number, exponentially. [hud](docs/hud.md#widgets-pull-and-the-throttle-is-the-point)
+- The crosshair gap is the real projection at the real FOV; `suppressed`, not `hidden` or `visible`. [hud](docs/hud.md#the-crosshair-does-the-real-projection)
+- `DotTableView` is boxes, never a grid; an absent width is an equal share, zero shrinks to content. [hud](docs/hud.md#dottableview)
+- A control built in code: use `set_anchors_and_offsets_preset`, or set all four offsets after the anchors. [hud](docs/hud.md#the-chat-box)
+- Never consume every key in `_input` (it starves a focused `LineEdit`); the ballot takes only its number keys, and none while a text field has focus. [hud](docs/hud.md#the-chat-box)
+- An open key is an `InputMap` action, never a hardcoded key. [hud](docs/hud.md#the-chat-box)
 
-**One bug that "nothing is rendered" hid for the whole life of this addon.**
-`set_anchors_preset(Control.PRESET_FULL_RECT)` sets the anchors and **leaves the offsets
-alone**, so a `Control` built in code keeps the zero size it was created with: the
-thing lays out inside nothing and is invisible while being, by every property,
-correctly configured. The family's own CLAUDE.md has carried that warning since dot-ui
-was written — and `DotScreenStack` had two of them, `DotCrosshair`, `DotHud` and
-`DotTableView` one each. Every screen this addon has ever hosted was 0 × 0 unless its
-host happened to size it. All five now use `set_anchors_and_offsets_preset`, and the
-suite measures a **size** rather than a property, because a property is exactly what
-was already right. Found by game-playground, which was the first project to put a
-screen on a stack whose parent is a plain `Node`.
+## Where a game plugs in
 
-## Things deliberately not here
+| To change | Where |
+| --- | --- |
+| What the interface looks like | assign a `Theme`, or `DotUiTheme` with a palette |
+| A screen | `DotScreen` subclass registered on a `DotScreenStack` |
+| What a HUD number shows | a `Callable` on `DotHudWidget` / `DotStatBar` / `DotCrosshair` |
+| The scoreboard's rows and columns | `DotScoreboardScreen.row_fn` / `columns`; `DotTableView.scoreboard_columns()` for the standard ones |
+| Where settings come from | any `Object` with `to_config()` / `absorb_config()`, or a `DotConfig`, on `DotSettingsScreen` |
+| What may be rebound | `DotBindingsPanel` (prefix filter, `ui_*` hidden) |
+| One binding in a settings document | `DotInputBinding` |
+| How chat is sent and received | `DotChatWindow.submitted` and `add_message`; `open_action`, `max_lines`, margins, `outline_size` |
+| What a ballot choice does | `DotBallotPanel.chosen` |
 
-- **Transitions and animation.** `DotUiConfig.transition_sec` and `reduced_motion` are
-  declared and nothing reads them. A tween that a headless test cannot observe, on a
-  stack whose whole value is being deterministic, is a bad first thing to add.
-- **Localisation.** Every string here is either a player-supplied name or a debug
-  label. A game calls `tr()` on what it passes in.
-- **Gamepad focus navigation.** `DotScreen.initial_focus` grabs focus and Godot's own
-  focus neighbours do the rest. A focus *ring* and edge-wrapping between containers is
-  a real design problem and half of one is worse than none.
-- **A console.** dot-server has `DotConsole` and its own command surface; a Control
-  that renders it belongs in a game, and would make dot-ui depend on dot-server.
-- **A server browser.** `DotTableView` is what one is built on. What fills it is
-  dot-auth's backbone client and the site's listing API.
-- **Nine-patch or textured styling.** Deliberate — see "ships no art". A game assigns
-  its own `Theme` and every widget here obeys it.
-- **Touch controls.** dot-player-controller ships `DotFpsTouchSampler`, which turns
-  fingers into commands and deliberately ships no layout. The on-screen buttons that
-  drive it are a game's design, and `DotScreen` is enough to build them on.
-
-## The scoreboard every game asked for (2026-10-06)
-
-`DotScoreboardScreen` is the Tab screen, shared: a title and a ranked `DotTableView`, with the **rows and the columns the game's** (`row_fn`, `columns`), because a deathmatch counts kills, an obstacle course points and an eating game mass. Transparent and non-blocking, like game-arena's own `ScoreboardScreen`, which predates it and still stands. `DotTableView` gained an icon column (`"kind": &"icon"`, a `Texture2D` per row) for an avatar beside a name; a row with no picture keeps the column's width, so the columns after it do not shift. `ui_selftest`'s *scoreboard screen* (5 checks).
+Deliberately not here: transitions (`transition_sec` and `reduced_motion` are declared and read by nothing), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)

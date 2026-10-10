@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 248
+const CHECKS := 263
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1833,6 +1833,73 @@ func _test_chat_window() -> void:
 	_check(early.line_count() == 3, "the log keeps only as many rows as it can draw")
 
 	early.queue_free()
+
+	# --- History ---------------------------------------------------------------
+
+	# [b]What faded is still there to read.[/b] A closed log is a glance and lets go of a
+	# line after ten seconds; a player who opens the box to find what somebody said a
+	# minute ago was finding nothing.
+	var past := DotChatWindow.new()
+	past.register_actions = false
+	past.history_limit = 30
+	past.history_lines = 4
+	past.history_page = 2
+	add_child(past)
+
+	for i in range(10):
+		past.add_text("old %d" % i)
+	past.feed().expire(Time.get_ticks_msec() + 600_000)
+	_check(past.line_count() == 0, "the closed log lets its lines fade")
+	_check(past.history().size() == 10, "and the history keeps every one of them")
+
+	past.open()
+	var view := past.get_node("History") as DotFeedView
+	_check(
+		view.visible and view.line_count() == 4,
+		"opening shows the newest rows of the history, as many as it is tall (%d)" % view.line_count()
+	)
+	_check(
+		str(((view.lines()[3]["parts"] as Array)[0] as Dictionary)["text"]) == "old 9",
+		"with the newest against the line being typed"
+	)
+
+	var page_up := InputEventKey.new()
+	page_up.keycode = KEY_PAGEUP
+	page_up.pressed = true
+	past.entry().gui_input.emit(page_up)
+	_check(past.history_scroll() == 2, "Page Up goes back a page")
+	_check(
+		str(((view.lines()[0]["parts"] as Array)[0] as Dictionary)["text"]) == "old 4",
+		"and the view shows the older rows"
+	)
+	_check(
+		str(((view.lines()[3]["parts"] as Array)[0] as Dictionary)["text"]).contains("2 newer"),
+		"with a row saying how much is below it"
+	)
+
+	past.add_text("new one")
+	_check(
+		past.history_scroll() == 3,
+		"a line arriving while somebody reads back does not move what they are reading"
+	)
+
+	_check(past.scroll_history(1000) == 7, "scrolling stops at the oldest row")
+	_check(past.scroll_history(-1000) == 0, "and at the newest")
+
+	past.close()
+	past.open()
+	_check(past.history_scroll() == 0, "the box reopens on the newest line")
+	past.close()
+	_check(not view.visible, "and closed, the fading log is what shows")
+
+	for i in range(40):
+		past.add_text("flood %d" % i)
+	_check(past.history().size() == 30, "the history is bounded")
+
+	past.clear()
+	_check(past.history().is_empty(), "and clear() empties it too")
+	_check(past.outline_size > 0, "the log is outlined by default")
+	past.queue_free()
 
 	var state := window.describe()
 	_check(

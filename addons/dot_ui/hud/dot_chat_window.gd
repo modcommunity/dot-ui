@@ -114,6 +114,31 @@ signal channel_changed(channel: StringName)
 ## How many sent lines the up arrow walks back through. Zero disables recall.
 @export_range(0, 50, 1) var recall_limit: int = 12
 
+@export_group("History")
+
+## Rows kept after they have faded from the log, for reading back with the box open.
+## Zero keeps none, and the open box shows only what the log still has.
+##
+## [b]Rows, not messages[/b], for the reason [member max_lines] is: a wrapped message is
+## several, and the bound is on memory and on what a scroll walks through.
+@export_range(0, 2000, 1) var history_limit: int = 200
+
+## Rows drawn while the box is open. The closed log stays [member max_lines] tall, so a
+## glance costs no more of the screen than it did; the open box grows upwards to show
+## more, because opening it is asking to read.
+@export_range(1, 60, 1) var history_lines: int = 12
+
+## Rows one Page Up / Page Down moves. The mouse wheel moves a third of it.
+@export_range(1, 60, 1) var history_page: int = 6
+
+## What is drawn behind the log while the box is open. Transparent draws nothing.
+##
+## [b]Only while open.[/b] Closed, the log is outlined rather than panelled (see
+## [DotFeedView]): a backing would be a dark rectangle in the corner of the view while
+## nobody is talking. Open, the player is reading, the game behind it is not what they are
+## looking at, and twelve rows of text over a busy floor want something under them.
+@export var open_backdrop: Color = Color(0.0, 0.0, 0.05, 0.45)
+
 @export_group("Layout")
 
 ## Anchor to the bottom left of the parent on ready.
@@ -150,7 +175,10 @@ signal channel_changed(channel: StringName)
 ## Passed straight through to [DotFeedView]; see its own note for why an outline rather
 ## than a panel. A game over a bright map wants 4 or 5 and a game over a dark one can
 ## leave it off.
-@export_range(0, 16, 1) var outline_size: int = 0
+##
+## [b]On by default[/b] since players on a pale map asked, in the chat itself, for a stroke
+## around the text. A game over a dark world can still turn it off.
+@export_range(0, 16, 1) var outline_size: int = 5
 
 @export_range(8.0, 40.0, 1.0) var line_height: float = 18.0
 @export_range(0.0, 20.0, 1.0) var line_gap: float = 2.0
@@ -169,6 +197,16 @@ var _open: bool = false
 var _channel: StringName = &""
 var _sent: PackedStringArray = PackedStringArray()
 var _recall: int = -1
+
+## The view drawn while the box is open, over the history rather than the fading log.
+var _history_view: DotFeedView = null
+
+## Every row added, oldest first, bounded by [member history_limit]. Each is the parts
+## array [DotFeedView] takes.
+var _history: Array = []
+
+## Rows scrolled up from the newest. Zero is following the conversation.
+var _scroll: int = 0
 
 
 func _ready() -> void:
@@ -305,6 +343,27 @@ func _build() -> void:
 	_feed.line_added.connect(func(_line: Dictionary) -> void: _relayout_log())
 	_feed.line_expired.connect(func(_line: Dictionary) -> void: _relayout_log())
 
+	# A second feed rather than the first one refilled. The closed log's lines carry the
+	# time each arrived, and that is what fades them; refilling it from the history on
+	# every open would restart every clock, and the lines a player had already seen go
+	# would come back for another ten seconds when they closed the box again.
+	_history_view = DotFeedView.new()
+	_history_view.name = "History"
+	_history_view.max_lines = history_lines
+	_history_view.lifetime_sec = 0.0
+	_history_view.hold = true
+	_history_view.newest_last = true
+	_history_view.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_history_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_history_view.line_height = line_height
+	_history_view.line_gap = line_gap
+	_history_view.outline_size = outline_size
+	_history_view.visible = false
+	var tall := float(history_lines) * (line_height + line_gap)
+	_anchor(_history_view, 0.0, 1.0, 1.0, 1.0, 0.0, -(tall + entry_height), 0.0, -entry_height)
+	add_child(_history_view)
+	_history_view.draw.connect(_draw_backdrop)
+
 	var row := HBoxContainer.new()
 	row.name = "Entry"
 	_anchor(row, 0.0, 1.0, 1.0, 1.0, 0.0, -entry_height, 0.0, 0.0)
@@ -338,6 +397,7 @@ func open(id: StringName = &"") -> void:
 
 	_open = true
 	_recall = -1
+	_scroll = 0
 	_entry.text = ""
 	_apply_open_state()
 
@@ -402,6 +462,12 @@ func _apply_open_state() -> void:
 	# reading it is a message you have to ask somebody to repeat.
 	if _feed != null:
 		_feed.hold = _open
+		_feed.visible = not _open or _history_view == null
+
+	if _history_view != null:
+		_history_view.visible = _open
+		if _open:
+			_show_history()
 
 	if _prompt != null:
 		_prompt.text = "%s: " % _label_of(_channel)
@@ -465,6 +531,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		open(_team_channel())
 
 
+## The wheel scrolls the open history. In [method Node._input] rather than unhandled,
+## because a game binds the wheel too (a weapon switch) and would otherwise act on the
+## same notch the history did.
+func _input(event: InputEvent) -> void:
+	if not _open or not (event is InputEventMouseButton):
+		return
+
+	var button := event as InputEventMouseButton
+
+	if not button.pressed:
+		return
+
+	var notch := maxi(1, history_page / 3)
+
+	match button.button_index:
+		MOUSE_BUTTON_WHEEL_UP:
+			scroll_history(notch)
+			get_viewport().set_input_as_handled()
+		MOUSE_BUTTON_WHEEL_DOWN:
+			scroll_history(-notch)
+			get_viewport().set_input_as_handled()
+
+
 ## True only for an action that exists. [method InputEvent.is_action_pressed] on an action
 ## the project does not have is an error per event, not a false — and a game that leaves
 ## [member register_actions] off has exactly that until it declares its own.
@@ -500,6 +589,14 @@ func _on_entry_gui_input(event: InputEvent) -> void:
 			return
 		KEY_DOWN:
 			_recall_step(-1)
+			_entry.accept_event()
+			return
+		KEY_PAGEUP:
+			scroll_history(history_page)
+			_entry.accept_event()
+			return
+		KEY_PAGEDOWN:
+			scroll_history(-history_page)
 			_entry.accept_event()
 			return
 		KEY_TAB:
@@ -582,8 +679,18 @@ func add_message(parts: Array) -> void:
 	if _feed == null:
 		return
 
-	for row in _wrap(parts):
+	var rows := _wrap(parts)
+
+	for row in rows:
 		_feed.add_line(row)
+		_remember_row(row)
+
+	if _open:
+		# Somebody reading back keeps their place: the rows that just arrived went in
+		# BELOW what they are looking at, so the offset from the newest grows with them.
+		if _scroll > 0:
+			_scroll = mini(_scroll + rows.size(), _max_scroll())
+		_show_history()
 
 
 ## Splits one line into as many as it takes to fit the box, at word boundaries.
@@ -694,6 +801,110 @@ func clear() -> void:
 	_ensure_built()
 	if _feed != null:
 		_feed.clear()
+	_history.clear()
+	_scroll = 0
+	if _history_view != null:
+		_history_view.clear()
+
+
+# --- History ---------------------------------------------------------------
+
+func _remember_row(row: Array) -> void:
+	if history_limit <= 0:
+		return
+
+	_history.append(row)
+
+	while _history.size() > history_limit:
+		_history.remove_at(0)
+
+
+## The rows a reader can scroll through: the kept history, or what the log still holds
+## when nothing is kept.
+func _rows() -> Array:
+	if history_limit > 0:
+		return _history
+
+	var out: Array = []
+	if _feed != null:
+		for line in _feed.lines():
+			out.append(line["parts"])
+	return out
+
+
+func _max_scroll() -> int:
+	return maxi(0, _rows().size() - history_lines)
+
+
+## Moves the open view by [param rows]: positive is back in time. Returns where it ended,
+## in rows up from the newest.
+func scroll_history(rows: int) -> int:
+	_ensure_built()
+	_scroll = clampi(_scroll + rows, 0, _max_scroll())
+	if _open:
+		_show_history()
+	return _scroll
+
+
+## How far up the open view is scrolled, in rows. Zero is the newest.
+func history_scroll() -> int:
+	return _scroll
+
+
+## Every row kept, oldest first, each the fragments it was drawn with.
+func history() -> Array:
+	return _rows().duplicate()
+
+
+## Draws the window of the history the scroll position says.
+##
+## [b]Rebuilt, not shifted.[/b] A view of twelve rows is twelve `add_line` calls, which
+## is nothing next to a frame, and a view built from the history every time cannot drift
+## out of step with it.
+func _show_history() -> void:
+	if _history_view == null:
+		return
+
+	var rows := _rows()
+	var end := rows.size() - _scroll
+	var start := maxi(0, end - history_lines)
+
+	_history_view.clear()
+
+	for i in range(start, end):
+		_history_view.add_line(rows[i])
+
+	# A reader scrolled back is told there is more below, in the last row, so they know
+	# the conversation did not stop where their view does.
+	if _scroll > 0 and _history_view.line_count() > 0:
+		var lines := _history_view.lines()
+		lines[lines.size() - 1] = {
+			"parts": [{
+				"text": "▼ %d newer — Page Down" % _scroll,
+				"colour": Color(0.70, 0.72, 0.78),
+			}],
+			"at_ms": Time.get_ticks_msec(),
+		}
+
+	# Sized to its rows, as [method _relayout_log] sizes the closed log: DotFeedView draws
+	# from its top edge, so a view twelve rows tall holding five drew them at the top with a
+	# gap over the entry, and the backdrop under the bottom of an empty box.
+	var shown := maxi(_history_view.line_count(), 1)
+	_history_view.offset_top = -(float(shown) * (line_height + line_gap) + entry_height)
+	_history_view.queue_redraw()
+
+
+func _draw_backdrop() -> void:
+	if _history_view == null or open_backdrop.a <= 0.0:
+		return
+
+	var top := -line_gap * 2.0
+	var height := _history_view.size.y - top
+
+	# On the view's own `draw` signal, which Godot emits BEFORE the view's `_draw` — so the
+	# rectangle is under the text without a third node, and it is exactly as tall as the
+	# rows drawn (the view is sized to them) and down through the entry.
+	_history_view.draw_rect(Rect2(-6.0, top, _history_view.size.x + 12.0, height + entry_height), open_backdrop)
 
 
 ## The log, for a game that wants to tune it further.
@@ -723,6 +934,8 @@ func describe() -> Dictionary:
 		"open_binding": DotInputBinding.describe_action(open_action),
 		"team_binding": DotInputBinding.describe_action(team_action),
 		"recalled": _sent.size(),
+		"history": _rows().size(),
+		"scroll": _scroll,
 	}
 
 

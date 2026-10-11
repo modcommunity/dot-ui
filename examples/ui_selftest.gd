@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 263
+const CHECKS := 264
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1536,6 +1536,10 @@ func _test_ballot_panel() -> void:
 	panel.show_state(_ballot_state("both", {"u1": 0}))
 	_check(panel.visible and panel.is_open() and panel.option_count() == 3, "a state opens it with its options")
 	_check(panel.size.x > 100.0 and panel.size.y > 100.0, "and it has a size of its own (%s)" % str(panel.size))
+	# By the string a game uses, not the constant: see COVER_GROUP.
+	var covers := get_tree().get_nodes_in_group(&"dot_hud_cover").filter(
+		func(n: Node) -> bool: return n is Control and (n as Control).is_visible_in_tree())
+	_check(covers.has(panel), "an open panel is a visible member of the dot_hud_cover group, which is how a game makes room")
 	_check(panel.seconds_left() > 19.0, "and counts the time it was told")
 	_check(
 		panel.row_rect(2).size.y > 0.0 and panel.row_rect(2).position.y > panel.row_rect(0).position.y,

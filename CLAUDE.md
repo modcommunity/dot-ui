@@ -77,5 +77,6 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | One binding in a settings document | `DotInputBinding` |
 | How chat is sent and received | `DotChatWindow.submitted` and `add_message`; `open_action`, `max_lines`, margins, `outline_size` |
 | What a ballot choice does | `DotBallotPanel.chosen` |
+| Keeping a game's HUD out from under a ballot | read the visible members of the `dot_hud_cover` group by that string ([hud](docs/hud.md#a-ballot-on-the-hud)) |
 
 Deliberately not here: transitions (`transition_sec` and `reduced_motion` are declared and read by nothing), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)

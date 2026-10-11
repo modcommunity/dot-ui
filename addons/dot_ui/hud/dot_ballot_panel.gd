@@ -50,6 +50,18 @@ signal dismissed()
 
 const CHANNEL := "ui.ballot"
 
+## The group a panel is in from the moment it exists: [b]how a game learns a ballot is on its
+## screen[/b] without being told. The panel is usually drawn by something the game did not
+## build and cannot reach — a client shell's overlay, over a delivered game — and a top-right
+## leaderboard or a wide menu sat under it unread. A game makes room by reading every
+## [i]visible[/i] Control in this group each frame and keeping its own widgets off their rects
+## ([method Control.get_global_rect] through the canvas transform, see docs/hud.md).
+##
+## [b]A game names the group by its string, not by this constant[/b], so it still loads on a
+## shell whose dot-ui predates the group: a delivered pack runs on the shell's addons, and a
+## missing constant is a parse error where a missing group is just nothing to avoid.
+const COVER_GROUP := &"dot_hud_cover"
+
 ## Rows drawn at most. A ballot is at most a handful; the number keys reach ten.
 const MAX_ROWS := 10
 
@@ -116,6 +128,10 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	set_process(true)
+	# In the group whether shown or not: a reader asks `is_visible_in_tree()`, which is also
+	# false when whatever holds the panel is hidden — a membership kept in step with
+	# `visible` here would not be.
+	add_to_group(COVER_GROUP)
 
 
 ## Adopts a ballot state. See the class notes for the shape; every field is optional.

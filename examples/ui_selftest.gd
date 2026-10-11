@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 271
+const CHECKS := 279
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 19
+const SECTIONS := 20
 
 var _passed := 0
 var _failed := 0
@@ -112,6 +112,7 @@ func _run() -> void:
 	_test_input_binding()
 	_test_chat_window()
 	_test_ballot_panel()
+	_test_ballot_avatar_rows()
 	await _test_settings_screen()
 	await _test_scoreboard_screen()
 
@@ -1684,6 +1685,135 @@ func _test_ballot_panel() -> void:
 	panel.show_state(_ballot_state("both"))
 	panel.show_state({"open": false})
 	_check(not panel.visible, "a close with no result takes it down at once")
+
+	panel.queue_free()
+	_done()
+
+
+func _game_ballot(voters: Dictionary, ids: Array = ["wipeout", "zombie", "g2g", "deathrun", "arena", "__keep__"]) -> Dictionary:
+	var labels := {
+		"wipeout": "Wipeout", "zombie": "Zombie Zone", "g2g": "g2gfast", "deathrun": "Deathrun",
+		"arena": "Arena", "__keep__": "Don't change", "smash": "Smash Copter",
+	}
+	var options := []
+	for id: String in ids:
+		options.append({"id": id, "label": labels.get(id, id), "votes": 0.0})
+	return {
+		"open": true, "title": "Vote for the next game", "command": "game_vote",
+		"seconds": 24.0, "input": "both", "options": options, "voters": voters,
+	}
+
+
+## Steps [param panel]'s avatars [param frames] frames at 60 fps.
+func _frames(panel: DotBallotPanel, frames: int) -> void:
+	for i in frames:
+		panel._process(1.0 / 60.0)
+
+
+## The row [param voter]'s avatar is drawn on now, or -1.
+func _row_drawn(panel: DotBallotPanel, voter: String) -> int:
+	var at := panel.avatar_position(voter)
+	for i in panel.option_count():
+		if panel.row_rect(i).has_point(at):
+			return i
+	return -1
+
+
+## The local voter's avatar against the row marked as theirs: ballot-panel-avatar-stale-row-1.
+##
+## A rendered game-vote frame showed the voter's avatar on row 5 while row 6, "Don't change",
+## was the marked choice and the result was up. Two ways to get there, both reproduced here:
+## a ballot decided by the click itself (the server closes it at once, so the result is
+## drawn while the avatar is still sliding down from the heading), and a server state sent
+## before the click arriving after it (the stale vote replaced the click, and with the
+## ballot closing on that click no later state ever corrected it).
+func _test_ballot_avatar_rows() -> void:
+	print("")
+	_section("ballot panel: the avatar sits on the row marked as the voter's")
+
+	var panel := DotBallotPanel.new()
+	panel.local_voter = "u9"
+	panel.result_hold_sec = 30.0
+	add_child(panel)
+
+	# 1. One player, one click, and the server closes the ballot on it.
+	panel.show_state(_game_ballot({}))
+	panel.snap_avatars()
+	panel.choose(5)
+	_frames(panel, 1)
+	panel.show_state({"open": false, "winner": "Don't change"})
+	_frames(panel, 2)
+	_check(
+		panel.choice_of("u9") == 5 and _row_drawn(panel, "u9") == 5,
+		"a ballot closed by the voter's own click shows their avatar on that row at once (row %d, drawn on %d)"
+			% [panel.choice_of("u9") + 1, _row_drawn(panel, "u9") + 1],
+		"the result was drawn while the avatar was still sliding from the heading"
+	)
+	panel.dismiss()
+
+	# 2. A state the server sent before the click arrives after it.
+	panel.show_state(_game_ballot({"u9": 4}))
+	panel.snap_avatars()
+	panel.choose(5)
+	panel.show_state(_game_ballot({"u9": 4}))
+	_check(
+		panel.choice_of("u9") == 5,
+		"a server state older than the click does not take the click back (row %d)" % (panel.choice_of("u9") + 1),
+		"the stale vote replaced the click; a ballot that then closed on it showed the old row"
+	)
+	panel.show_state({"open": false, "winner": "Don't change"})
+	_frames(panel, 2)
+	_check(
+		panel.choice_of("u9") == 5 and _row_drawn(panel, "u9") == 5,
+		"and the result closed on that click shows the avatar on the clicked row (drawn on %d)" % (_row_drawn(panel, "u9") + 1)
+	)
+	panel.dismiss()
+
+	# 3. The server's word wins once a round trip has had time to happen.
+	panel.show_state(_game_ballot({"u9": 4}))
+	panel.choose(5)
+	panel._pending_until_ms = Time.get_ticks_msec() - 1
+	panel.show_state(_game_ballot({"u9": 4}))
+	_check(panel.choice_of("u9") == 4, "a server that still says otherwise after the round trip is believed (row %d)" % (panel.choice_of("u9") + 1))
+	panel.show_state(_game_ballot({"u9": 5}))
+	panel.choose(5)
+	panel.show_state(_game_ballot({"u9": 5}))
+	panel.show_state(_game_ballot({"u9": 2}))
+	_check(panel.choice_of("u9") == 2, "and once the server has confirmed the click, its next word is the vote (row %d)" % (panel.choice_of("u9") + 1))
+	panel.dismiss()
+
+	# 4. A new ballot over an old one: nothing carries over.
+	panel.show_state(_game_ballot({}))
+	panel.choose(5)
+	panel.show_state(_game_ballot({}, ["smash", "arena", "__keep__"]))
+	_frames(panel, 30)
+	_check(
+		panel.choice_of("u9") == -1 and panel.avatar_position("u9") == Vector2(-1, -1),
+		"a new ballot does not inherit the last one's click (row %d)" % (panel.choice_of("u9") + 1)
+	)
+	panel.dismiss()
+
+	# 5. The same options in another order: the vote follows the option, not the number.
+	panel.show_state(_game_ballot({}))
+	panel.choose(4)
+	panel.show_state(_game_ballot({"u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 60)
+	_check(
+		str(panel._options[panel.choice_of("u9")]["id"]) == "arena" and _row_drawn(panel, "u9") == panel.choice_of("u9"),
+		"reordered options keep the voter on the option they chose, avatar and mark together (row %d, drawn on %d)"
+			% [panel.choice_of("u9") + 1, _row_drawn(panel, "u9") + 1]
+	)
+
+	# 6. Votes changing under everybody: every avatar settles on its own voter's row.
+	panel.show_state(_game_ballot({"u1": 0, "u2": 5, "u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 10)
+	panel.show_state(_game_ballot({"u1": 3, "u2": 1, "u9": 5}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 90)
+	_check(
+		_row_drawn(panel, "u1") == 3 and _row_drawn(panel, "u2") == 1 and _row_drawn(panel, "u9") == 5,
+		"changed votes settle every avatar on its voter's new row (%d, %d, %d)"
+			% [_row_drawn(panel, "u1") + 1, _row_drawn(panel, "u2") + 1, _row_drawn(panel, "u9") + 1]
+	)
 
 	panel.queue_free()
 	_done()

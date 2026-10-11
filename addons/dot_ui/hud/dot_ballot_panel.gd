@@ -123,6 +123,18 @@ var _positions: Dictionary = {}
 ## voter -> Texture2D, once [member avatar_fn] has answered.
 var _textures: Dictionary = {}
 
+## How long the local player's click outranks what the server says: a round trip with room.
+## A state the server sent before it heard the click can arrive after it, and without this the
+## click was taken back; when the ballot then closed on that very click, no later state put it
+## right and the result showed the voter on the row they had left.
+const PENDING_MS := 3000
+
+## The local player's click the server has not yet confirmed, -1 for none; until when it
+## stands; and the options it was made against, so another ballot never inherits it.
+var _pending_choice := -1
+var _pending_until_ms := 0
+var _pending_ids := PackedStringArray()
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -143,11 +155,19 @@ func show_state(p_state: Dictionary) -> void:
 	if not open:
 		_open = false
 		_winner = _clean(state.get("winner", ""), 48)
+		# Whatever the server last said plus a click it has not answered: a ballot that closes
+		# on a click closes before any state carrying it can arrive.
+		_pending_choice = -1
 
 		if _winner != "" and result_hold_sec > 0.0:
 			_result_until_ms = Time.get_ticks_msec() + int(result_hold_sec * 1000.0)
 			_set_pointer(false)
 			visible = true
+			# [b]A result is a statement, not a motion.[/b] A ballot decided by the click
+			# that closes it (one player, or the last vote needed) has the result drawn a
+			# frame or two after the click, while that avatar is still sliding down from the
+			# heading: a rendered frame showed it a row short of the marked choice.
+			snap_avatars()
 			queue_redraw()
 		else:
 			dismiss()
@@ -191,6 +211,7 @@ func show_state(p_state: Dictionary) -> void:
 				_voters[str(voter)] = int(index)
 
 	_people = state.get("people", {}) if state.get("people", {}) is Dictionary else {}
+	_keep_pending_choice()
 
 	# Somebody who left, or whose vote the server no longer has, leaves the board.
 	for voter: Variant in _positions.keys():
@@ -213,6 +234,7 @@ func dismiss() -> void:
 	_result_until_ms = 0
 	_set_pointer(false)
 	_positions.clear()
+	_pending_choice = -1
 	visible = false
 
 	if was:
@@ -274,10 +296,41 @@ func choose(index: int) -> bool:
 
 	if local_voter != "":
 		_voters[local_voter] = index
+		_pending_choice = index
+		_pending_until_ms = Time.get_ticks_msec() + PENDING_MS
+		_pending_ids = _option_ids()
 
 	chosen.emit(index, str(_options[index]["id"]), _command)
 	queue_redraw()
 	return true
+
+
+## Puts the local player's unconfirmed click back over a server state that predates it.
+##
+## Confirmed (the server's state shows it) or expired, the server's word stands from then on;
+## a different ballot (other options, or the same ones in another order, where the index means
+## something else) drops it.
+func _keep_pending_choice() -> void:
+	if _pending_choice < 0 or local_voter == "":
+		return
+
+	if _option_ids() != _pending_ids or Time.get_ticks_msec() >= _pending_until_ms \
+			or _pending_choice >= _options.size():
+		_pending_choice = -1
+		return
+
+	if int(_voters.get(local_voter, -1)) == _pending_choice:
+		_pending_choice = -1
+		return
+
+	_voters[local_voter] = _pending_choice
+
+
+func _option_ids() -> PackedStringArray:
+	var out := PackedStringArray()
+	for option in _options:
+		out.append(str(option["id"]))
+	return out
 
 
 ## The rect of option [param index]'s row, for a host or a test that wants to click it.

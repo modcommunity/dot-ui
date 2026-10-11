@@ -26,7 +26,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen` |
 | `addons/dot_ui/dot_ui_config.gd` | `DotUiConfig`, the interface's own settings document |
 | `examples/ui_selftest.tscn` | the suite, offline |
-| `tools/screenshot.sh` | renders pause, settings, HUD, chat and ballot frames to `screenshots/` through `xvfb-run` |
+| `tools/screenshot.sh` | renders pause, settings, HUD, chat, ballot and ballot-result frames to `screenshots/` through `xvfb-run` |
 
 ## Running and testing
 
@@ -64,6 +64,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - A control built in code: use `set_anchors_and_offsets_preset`, or set all four offsets after the anchors. [hud](docs/hud.md#the-chat-box)
 - Never consume every key in `_input` (it starves a focused `LineEdit`); the ballot takes only its number keys, and none while a text field has focus. [hud](docs/hud.md#the-chat-box)
 - An open key is an `InputMap` action, never a hardcoded key. [hud](docs/hud.md#the-chat-box)
+- A ballot's unconfirmed local click outranks a disagreeing server state for `PENDING_MS` on the same options; a closed result snaps the avatars. [hud](docs/hud.md#a-ballot-on-the-hud)
 
 ## Where a game plugs in
 

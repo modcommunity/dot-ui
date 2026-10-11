@@ -26,6 +26,7 @@ var _stack: DotScreenStack = null
 var _hud: DotHud = null
 var _chat: DotChatWindow = null
 var _ballot: DotBallotPanel = null
+var _result: DotBallotPanel = null
 var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
@@ -81,6 +82,11 @@ func _initialize() -> void:
 		# that has to squeeze its avatars, one picture avatar among initials, and the local
 		# player's own choice marked.
 		{"id": &"", "file": "ballot.png", "ballot": true},
+		# The result of a ballot the local player decided with one click: they pick the last
+		# row, the server closes it at once, and the frame a few frames later must already
+		# show their avatar on that row. A game vote with one player on it does exactly this,
+		# and a frame of it once showed the avatar a row short of the marked choice.
+		{"id": &"", "file": "ballot_result.png", "result": true},
 	]
 
 
@@ -225,6 +231,33 @@ func _build_ballot() -> void:
 	_ballot.snap_avatars()
 
 
+## A six-row ballot the local player decides: a click on the last row, and the close that
+## follows at once, as a server with one voter on it sends.
+func _build_result() -> void:
+	_result = DotBallotPanel.new()
+	_result.name = "Result"
+	_result.position = Vector2(40.0, 120.0)
+	_result.local_voter = "u3"
+	_result.result_hold_sec = 30.0
+	_hud.add_child(_result)
+	_result.show_state({
+		"open": true, "title": "Vote for the next game", "command": "game_vote",
+		"seconds": 24.0, "input": "both",
+		"options": [
+			{"id": "wipeout", "label": "Wipeout", "votes": 0.0},
+			{"id": "zombiezone", "label": "Zombie Zone", "votes": 0.0},
+			{"id": "g2gfast", "label": "g2gfast", "votes": 0.0},
+			{"id": "deathrun", "label": "Deathrun", "votes": 0.0},
+			{"id": "arena", "label": "Arena", "votes": 0.0},
+			{"id": "__keep__", "label": "Don't change", "votes": 0.0},
+		],
+		"voters": {}, "people": {"u3": {"name": "quiet_one", "avatar": ""}},
+	})
+	_result.snap_avatars()
+	_result.choose(5)
+	_result.show_state({"open": false, "winner": "Don't change"})
+
+
 func _process(_delta: float) -> bool:
 	if _done:
 		return true
@@ -251,6 +284,9 @@ func _process(_delta: float) -> bool:
 			_ballot._hover = 1
 		elif _ballot != null:
 			_ballot.visible = false
+
+		if bool(shot.get("result", false)):
+			_build_result()
 
 		# An empty id means "show nothing", which is how the HUD gets a frame of its own:
 		# the stack's `hides_below` takes it down under an opaque screen, deliberately.

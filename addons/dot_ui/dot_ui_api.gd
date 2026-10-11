@@ -10,5 +10,7 @@ extends RefCounted
 # 2: DotInputBinding names the wheel and the side buttons ("Wheel up", "Mouse back";
 #    MOUSE_NAMES, mouse_text) and still reads the old "Mouse 4". A game that wrote its own
 #    "(wheel up)" beside a "Mouse 4" can ask for this level before dropping it.
-const LEVEL := 2
+# 3: DotChatWindow honours the player's own block list: self_mute, self_mute_enabled,
+#    self_mute_colour, is_self_muted(); `!sm` / `/sm` are run and never emitted.
+const LEVEL := 3
 const OLDEST := 1

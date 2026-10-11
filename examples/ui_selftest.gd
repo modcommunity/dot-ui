@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 279
+const CHECKS := 283
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1819,6 +1819,19 @@ func _test_ballot_avatar_rows() -> void:
 	_done()
 
 
+class FakeSelfMute extends RefCounted:
+	var ran: Array[String] = []
+	var muted: Dictionary = {}
+	func claims_chat(text: String) -> bool:
+		var t := text.strip_edges().to_lower()
+		return (t.begins_with("!") or t.begins_with("/")) and (t.substr(1) == "sm" or t.substr(1).begins_with("sm "))
+	func handle_chat(text: String) -> PackedStringArray:
+		ran.append(text)
+		return PackedStringArray(["ran"])
+	func is_muted(name: String, _sender: String = "") -> bool:
+		return muted.has(name)
+
+
 func _test_chat_window() -> void:
 	print("")
 	_section("chat window")
@@ -1897,6 +1910,7 @@ func _test_chat_window() -> void:
 	_check(said.size() == 1, "an empty line sends nothing")
 	_check(not window.is_open(), "and still closes the box")
 
+
 	# Escape, on the entry's own gui_input, which is the path a focused LineEdit takes.
 	window.open()
 	var escape := InputEventKey.new()
@@ -1919,6 +1933,32 @@ func _test_chat_window() -> void:
 	window.entry().gui_input.emit(down)
 	_check(window.entry().text == "", "and down comes back to an empty line")
 	window.close()
+
+	# `!sm` / `/sm`, the player's own block list: run here and never emitted, so it cannot
+	# reach the server and nobody is told. A stand-in for dot-chat's DotChatSelfMute, which
+	# dot-ui does not link.
+	var mutes := FakeSelfMute.new()
+	window.self_mute = mutes
+	for typed in ["!sm ada", "/SM"]:
+		window.open()
+		window.entry().text = typed
+		window.entry().text_submitted.emit(window.entry().text)
+	_check(said.size() == 1 and mutes.ran == ["!sm ada", "/SM"],
+		"!sm and /sm run on this client and are never emitted (%s)" % str(mutes.ran))
+	window.open()
+	window.entry().text = "!smile"
+	window.entry().text_submitted.emit(window.entry().text)
+	_check(said.size() == 2 and said[-1]["text"] == "!smile", "a longer word is still sent")
+	said.pop_back()
+	var before := window.line_count()
+	mutes.muted["Ada"] = true
+	window.add_said("Ada", "you do not see this")
+	_check(window.line_count() == before, "a line from a muted player is not drawn")
+	mutes.muted.erase("Ada")
+	window.add_said("Ada", "you see this")
+	_check(window.line_count() > before, "and is again once they are unmuted")
+	window.self_mute = null
+	window.self_mute_enabled = false
 
 	# Channels.
 	var changed: Array[StringName] = []

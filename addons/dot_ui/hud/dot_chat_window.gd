@@ -190,6 +190,27 @@ signal channel_changed(channel: StringName)
 ## import dot-chat and does not know what a channel is. A game maps its own.
 var channels: Array[Dictionary] = []
 
+## Whether this box honours the player's own block list: `!sm` / `/sm` typed here run it and
+## are never emitted, and [method add_said] drops a line from a muted player.
+##
+## [b]The one piece of chat this box knows, and why it is here.[/b] `sm` must never reach the
+## server, or the muted player could be told; every game in the family sends what this box
+## emits, by a different path each, so the only place that stops it in all of them is the
+## place before [signal submitted]. The list itself is dot-chat's `DotChatSelfMute`, found
+## by registry name or by path and duck-typed, so dot-ui still depends on dot-core alone.
+@export var self_mute_enabled: bool = true
+
+## The colour of what `sm` answers.
+@export var self_mute_colour: Color = Color(0.72, 0.80, 0.90)
+
+## The block list: anything with `claims_chat(text)`, `handle_chat(text)` and
+## `is_muted(name)`. Null finds the shared one (registry `dot_self_mute`, else dot-chat's
+## script by path) the first time it is needed.
+var self_mute: Object = null
+
+const SELF_MUTE_SERVICE := &"dot_self_mute"
+const SELF_MUTE_SCRIPT := "res://addons/dot_chat/runtime/dot_chat_self_mute.gd"
+
 var _feed: DotFeedView = null
 var _entry: LineEdit = null
 var _prompt: Label = null
@@ -618,9 +639,44 @@ func _on_submitted(text: String) -> void:
 
 	if trimmed != "":
 		_remember(trimmed)
-		submitted.emit(trimmed, _channel)
+		if not _ran_locally(trimmed):
+			submitted.emit(trimmed, _channel)
 
 	close()
+
+
+## Runs `!sm` / `/sm` here and says whether it did. A line it ran is never emitted.
+func _ran_locally(text: String) -> bool:
+	var mutes := _self_mute()
+	if mutes == null or not mutes.has_method(&"claims_chat") or not bool(mutes.call(&"claims_chat", text)):
+		return false
+	var reply: Variant = mutes.call(&"handle_chat", text)
+	if reply is PackedStringArray or reply is Array:
+		for line in reply:
+			add_text(str(line), self_mute_colour)
+	return true
+
+
+func _self_mute() -> Object:
+	if not self_mute_enabled or Engine.is_editor_hint():
+		return null
+	if self_mute != null and is_instance_valid(self_mute):
+		return self_mute
+	self_mute = DotRegistry.get_service(SELF_MUTE_SERVICE)
+	if self_mute == null and ResourceLoader.exists(SELF_MUTE_SCRIPT):
+		var script: Variant = load(SELF_MUTE_SCRIPT)
+		if script is Script and (script as Script).can_instantiate():
+			var shared: Variant = (script as Script).call(&"shared")
+			self_mute = shared if shared is Object else null
+	return self_mute
+
+
+## Whether [param speaker] is on the player's block list.
+func is_self_muted(speaker: String) -> bool:
+	if speaker == "":
+		return false
+	var mutes := _self_mute()
+	return mutes != null and mutes.has_method(&"is_muted") and bool(mutes.call(&"is_muted", speaker, ""))
 
 
 func _remember(text: String) -> void:
@@ -789,6 +845,11 @@ func add_said(
 
 	if speaker == "":
 		add_text(text, text_colour)
+		return
+
+	# A player the reader muted (`sm`). Here as well as in dot-chat's client, because
+	# some games draw a line without one.
+	if is_self_muted(speaker):
 		return
 
 	add_message([

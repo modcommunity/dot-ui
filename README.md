@@ -58,6 +58,9 @@ The second idea is that **dot-ui ships no art and imports nothing.** No textures
 | `DotFeedView` | A bounded, self-expiring list of coloured fragments. Kill feed and chat. |
 | `DotChatWindow` | A chat box: a log that fades, a line to type in, and a key that opens it. |
 | `DotTableView` | Rows and columns. Scoreboard, server browser, ban list. |
+| `DotVitals`, `DotAmmoCounter`, `DotScoreStrip` | The glance HUD: health with armour on one plate, `magazine \| reserve` under the weapon's name, the clock with two optional score plates. Values in, theme colours, readable over a pale map. |
+| `DotHitMarker`, `DotDamageNumbers` | Four ticks on a confirmed hit, red on a kill; numbers that rise off where a hit landed and add up over a burst. |
+| `DotKeyPrompt`, `DotKeyHints` | "Open door [E]" and a column of keys worth knowing, with the player's binding drawn as a key. |
 | `DotBallotPanel` | A ballot on the HUD from a dot-vote `DotVoteBallotView` dictionary: number keys, a click, or both, a countdown, and each voter's avatar on the option they chose. Emits `chosen`; what a choice becomes is the host's. |
 | `DotSettingsPanel` | Builds itself from a `DotConfig`. Never shows a secret. |
 | `DotBindingsPanel` | Rebinding, conflict detection, and a file that survives a restart. |

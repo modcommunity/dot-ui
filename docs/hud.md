@@ -72,6 +72,46 @@ An icon column (`"kind": &"icon"`, a `Texture2D` per row) puts an avatar beside 
 
 **It draws itself.** Avatars travel across rows, and a container would fight every one of them; rows, labels and discs are `_draw`, and the hit test is the same rects. A picture avatar is a textured polygon (a Control cannot clip one draw call to a circle); a voter with no picture is a disc coloured from their id by golden-ratio hue, because neighbouring ids hash to neighbouring numbers and a plain modulo drew nine people in two colours. Labels are cut with an ellipsis, never mid-word.
 
+## The glance pieces
+
+`DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt` and `DotKeyHints`, all on `DotHudPiece`. They were game-arena's "glance" HUD (`game/arena_hud_glance.gd` and the feedback classes in `arena_hud.gd`, 2026-10-10), and moved here once more than one game drew its own version of each.
+
+- **Values in, never a game object.** Each piece draws from what it is handed (`show_vitals`, `show_ammo`, `show_clock`, `flash`, `add`), so a suite drives one alone and a render tool puts one up with chosen numbers. The host reads its game once a frame.
+- **Readable over a pale map.** Bold text with an outline in the theme's `ink`, on a translucent `plate`. The first arena HUD drew thin regular-weight text straight over white tiles and the health, ammunition and key hints all but vanished.
+- **Theme-driven, with defaults that need no theme.** Colours are theme colours on the type `DotHudPiece` (`plate`, `plate_edge`, `text`, `dim`, `low`, `good`, `highlight`, `ink`, `keycap`, `keycap_text`); an absent one is `DotHudPiece.DEFAULTS`, which is arena's look. `DotUiTheme.build()` fills every one from its palette (`highlight` is a new palette colour), and makes `ink` the background, so a light palette draws dark numbers ringed in light. A theme `font` on the type replaces the emboldened fallback font.
+- **Scaled with the HUD, never laid out again.** Every number is in the HUD's units. `DotHud.fit_design` (1280x720 for these pieces) makes a `DotHud` place itself by hand and scale the whole layer by `DotHud.fit_scale` on a smaller frame (the short side's share, never under `fit_min`, never above 1). Arena found the need standalone at 854x480, where the pieces ran into each other; one scale keeps every piece and every distance between them, and is the same answer a client shell's 1280x720 canvas gives. Zero, the default, is the old full-rect anchoring.
+- **Out from under a ballot.** Each frame a piece reads every visible member of `dot_hud_cover` (the string, `DotHudPiece.COVER_GROUP`, for the reason in [a ballot on the HUD](#a-ballot-on-the-hud)) into its own space through the canvas transforms, and where one meets its `footprint()` does what `cover_mode` says: `DIM` (the default, to `cover_alpha`), `HIDE` or `IGNORE`. **Each cover is tested on its own**: merged, two covers in opposite corners cover everything between them (the first suite run found exactly that with a ballot left over from an earlier section). The hit marker and damage numbers are full-rect and default to `IGNORE`, since their rect always meets a cover. `DotHudPiece.covered_rect()` (merged) is for a host that moves its own widgets out of the way, as arena's weapon slots do.
+- **Every piece says where it draws** (`footprint()`, its own space). A host collects them to check that no two meet at several frame sizes, which is how arena's layout check works.
+- `DotVitals` eases the bar and never the number, exponentially, for the reason `DotStatBar` does; a first value is drawn at once, not eased in from full. A `bonus` (health that drains away) is drawn after the real fill, a `status` ("DOWN") replaces the number, and health is rounded up, because a player on 0.4 is alive.
+- `DotScoreStrip.clock_text` rounds up, so a clock never says 0:00 with time left; arena's own clock rounded down. The score plates are optional: seven games draw a clock alone.
+- `DotHitMarker` is flashed by the host from a hit the server confirmed, never the local prediction; a non-lethal hit does not turn a fresh kill marker white (pellets after the lethal one).
+- `DotDamageNumbers` projects a world point through the viewport's camera (or `camera`) every frame, so a number stays on the body as the view moves; `add_at` takes a point in its own space for a 2D game. Hits on one victim within `merge_sec` add up.
+- `DotKeyPrompt` and `DotKeyHints` take the key's name from the host (the player's binding as text), never a letter written into the game.
+
+### Which pieces moved, and which stayed in game-arena
+
+Decided 2026-10-11 by grepping every game's HUD for its own version (`dot-ui-hud-pieces-1`). "Draws its own" is a hand-rolled equivalent today; "wants" is a game with the need and nothing on screen.
+
+| Arena piece | Games that would use it | Decision | Why |
+| --- | --- | --- | --- |
+| `Vitals` (+ two `DotStatBar`s) | arena; game-zombie-zone (bar, borrowed health, DOWN/DEAD); mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun (a bare number `Label`, red under a quarter); mg-prop-hunt (number on its disc) | moved: `DotVitals` | seven games draw health, each its own way |
+| `AmmoCounter` | arena; game-zombie-zone (`"%d / ∞"` label); game-playground wants one (carries the weapon pack, shows no count) | moved: `DotAmmoCounter` | three games; the endless reserve is zombie-zone's |
+| `ScoreStrip` | arena (scores and clock); game-hide-n-seek, mg-prop-hunt, mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun, game-zombie-zone, game-hungario (a centred `"%d:%02d"` label) | moved: `DotScoreStrip`, plates optional | nine games draw a clock |
+| `HitMarker` | arena; wanted by game-playground, game-g2gfast (combat maps) and game-zombie-zone, which all fire the weapon pack and confirm no hit on screen | moved: `DotHitMarker` | three more shooters |
+| `DamageNumbers` | arena; the same three | moved: `DotDamageNumbers`, plus `add_at` for 2D | same consumers as the marker |
+| `Prompt` | arena; game-hide-n-seek (door), mg-deathrun (trap), mg-look-at-me (`"[E] …"`), mg-prop-hunt (`"press %s"`), game-zombie-zone (kits) | moved: `DotKeyPrompt` | five games write the key into a sentence |
+| `KeyHints` | arena; game-zombie-zone's kit line | moved: `DotKeyHints` | the prompt's keycap, and a second game |
+| `make_room` / `covered_rect` | arena, game-hungario and mg-dangerous-delivery each read `dot_hud_cover` by hand | moved: `DotHudPiece.cover_mode`, `cover_rects`, `covered_rect` | three readers of one group |
+| `fit_scale` / `fit_to_frame` | arena (HUD and chat box) | moved: `DotHud.fit_design`, `fit_scale`, `fit_to_frame` | every piece above is drawn in a 1280x720 design |
+| `KillFeed` (weapon silhouettes) | arena; game-hungario uses `DotFeedView` | stays in arena | `DotFeedView` is the shared feed; the silhouettes are arena's generated art and no other game has weapon icons. An icon fragment in `DotFeedView` is the move when one does |
+| `Portraits` + `PortraitCache` | arena | stays | renders arena's avatar rig into viewports; the ranked row can move once dot-user-avatar renders heads |
+| `WeaponSlots` | arena | stays | arena's silhouettes, and its ballot tightening is tuned to arena's column; no other game shows carried slots |
+| `AbilityBar` | arena | stays | arena's movement abilities |
+| `MedalRow` | arena | stays | draws arena's medal enum and icons; no second game awards medals |
+| `StreakMeter` | arena | stays | killstreaks are arena's |
+
+**An extraction is finished when the last caller moves.** Each game above with a hand-rolled equivalent has a queue item `hud-pieces-<game>-1`; until it is done that game still draws its own, arena included.
+
 ## Deliberately not here
 
 - **Transitions and animation.** `DotUiConfig.transition_sec` and `reduced_motion` are declared and nothing reads them. A tween that a headless test cannot observe, on a stack whose whole value is being deterministic, is a bad first thing to add.

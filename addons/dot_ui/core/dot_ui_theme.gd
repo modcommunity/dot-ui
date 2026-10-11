@@ -28,6 +28,8 @@ extends Resource
 @export var text_dim: Color = Color(0.62, 0.65, 0.70, 1.0)
 @export var danger: Color = Color(0.90, 0.30, 0.28, 1.0)
 @export var good: Color = Color(0.35, 0.80, 0.45, 1.0)
+## What a HUD piece draws to say "yours" or "special": your own row, a headshot's number.
+@export var highlight: Color = Color(1.0, 0.8, 0.22, 1.0)
 
 @export_group("Metrics")
 
@@ -105,6 +107,7 @@ func build(scale: float = 1.0) -> Theme:
 	_style_line_edit(theme, unit)
 	_style_ranges(theme, unit)
 	_style_containers(theme, unit)
+	_style_hud_pieces(theme)
 
 	return theme
 
@@ -229,6 +232,26 @@ func _style_containers(theme: Theme, unit: float) -> void:
 	theme.set_constant("margin_right", "MarginContainer", gap)
 	theme.set_constant("margin_top", "MarginContainer", gap)
 	theme.set_constant("margin_bottom", "MarginContainer", gap)
+
+
+## The glance pieces' colours ([DotHudPiece]) from the palette. The plate is the
+## background made see-through, because a HUD plate that hid the floor would be a panel;
+## `ink` (the outline under every number) is the background too, so a light palette draws
+## dark numbers ringed in light rather than in black.
+func _style_hud_pieces(theme: Theme) -> void:
+	var t := DotHudPiece.THEME_TYPE
+	theme.set_color(&"plate", t, Color(background, 0.62))
+	theme.set_color(&"plate_edge", t, Color(outline, 0.35))
+	theme.set_color(&"text", t, text)
+	theme.set_color(&"dim", t, text_dim)
+	theme.set_color(&"low", t, danger)
+	theme.set_color(&"good", t, good)
+	theme.set_color(&"highlight", t, highlight)
+	theme.set_color(&"ink", t, Color(background.darkened(0.6) if background.get_luminance() < 0.5 else background, 0.85))
+	theme.set_color(&"keycap", t, Color(text, 0.95))
+	theme.set_color(&"keycap_text", t, background.darkened(0.2) if background.get_luminance() < 0.5 else surface)
+	if font != null:
+		theme.set_font(&"font", t, font)
 
 
 func describe() -> Dictionary:

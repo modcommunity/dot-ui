@@ -1,6 +1,6 @@
 # dot-ui
 
-Screens, HUD and menus with no art assets: a screen stack that owns z-order, input, mouse mode and pause; pause, settings and scoreboard screens; a settings panel and a rebinder; HUD widgets (stat bar, crosshair, feed, table, chat box, ballot); and a theme generated from a palette.
+Screens, HUD and menus with no art assets: a screen stack that owns z-order, input, mouse mode and pause; pause, settings and scoreboard screens; a settings panel and a rebinder; HUD widgets (stat bar, crosshair, feed, table, chat box, ballot) and the glance pieces (vitals, ammo, score strip and clock, hit marker, damage numbers, key prompt and hints); and a theme generated from a palette.
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to the interface. The reasoning is in [docs/](docs/README.md). dot-menu builds the designed Escape menu and Tab scoreboard on top of this.
 
@@ -12,7 +12,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | --- | --- |
 | [docs/README.md](docs/README.md) | the index |
 | [docs/screens.md](docs/screens.md) | the stack, screen ids, pause, the shared screens, the settings and bindings panels, `DotInputBinding` |
-| [docs/hud.md](docs/hud.md) | the theme, widgets, crosshair, table, chat box, ballot, what is deliberately not here |
+| [docs/hud.md](docs/hud.md) | the theme, widgets, crosshair, table, chat box, ballot, the glance pieces and which arena pieces moved, what is deliberately not here |
 | [docs/testing.md](docs/testing.md) | adding a check, or believing one; the screenshots |
 | [docs/history.md](docs/history.md) | the bugs, and how each looked |
 
@@ -21,12 +21,12 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Path | What |
 | --- | --- |
 | `addons/dot_ui/core/` | `DotScreen`, `DotScreenStack`, `DotUiTheme`, `DotInputBinding` |
-| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield` |
+| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
 | `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
 | `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen` |
 | `addons/dot_ui/dot_ui_config.gd` | `DotUiConfig`, the interface's own settings document |
 | `examples/ui_selftest.tscn` | the suite, offline |
-| `tools/screenshot.sh` | renders pause, settings, HUD, chat, ballot and ballot-result frames to `screenshots/` through `xvfb-run` |
+| `tools/screenshot.sh` | renders pause, settings, HUD, chat, ballot, ballot-result and the three glance-piece frames (`hud_pieces*.png`: no theme, light theme, fitted to 854x480) to `screenshots/` through `xvfb-run` |
 
 ## Running and testing
 
@@ -66,6 +66,10 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - An open key is an `InputMap` action, never a hardcoded key. [hud](docs/hud.md#the-chat-box)
 - `DotChatWindow` runs `!sm` / `/sm` itself and never emits them; `add_said` drops a self-muted speaker. The list is found by registry name or path, never named. [hud](docs/hud.md#the-chat-box)
 - A ballot's unconfirmed local click outranks a disagreeing server state for `PENDING_MS` on the same options; a closed result snaps the avatars. [hud](docs/hud.md#a-ballot-on-the-hud)
+- A glance piece takes values, never a game object; its colours are theme colours on `DotHudPiece` with `DEFAULTS` behind them; it says where it draws in `footprint()`. [hud](docs/hud.md#the-glance-pieces)
+- A piece tests each `dot_hud_cover` member on its own against its footprint, never the merged rect, and the full-rect pieces (hit marker, damage numbers) default to `IGNORE`. [hud](docs/hud.md#the-glance-pieces)
+- `DotHud.fit_design` scales the whole HUD below the design frame and never lays it out again; zero keeps the full-rect anchoring. [hud](docs/hud.md#the-glance-pieces)
+- A new piece or a new public method on one is an API level (`dot_ui_api.gd`): a delivered pack runs on the shell's dot-ui. [hud](docs/hud.md#the-glance-pieces)
 
 ## Where a game plugs in
 
@@ -80,6 +84,8 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | One binding in a settings document | `DotInputBinding` |
 | How chat is sent and received | `DotChatWindow.submitted` and `add_message`; `open_action`, `max_lines`, margins, `outline_size` |
 | What a ballot choice does | `DotBallotPanel.chosen` |
+| Health, ammunition, the clock and scores, hit feedback, key prompts | the glance pieces' `show_*` / `flash` / `add`; `cover_mode`; theme colours on `DotHudPiece` |
+| Scaling a HUD on a small frame | `DotHud.fit_design`, `fit_scale`, `fit_to_frame` |
 | Keeping a game's HUD out from under a ballot | read the visible members of the `dot_hud_cover` group by that string ([hud](docs/hud.md#a-ballot-on-the-hud)) |
 
 Deliberately not here: transitions (`transition_sec` and `reduced_motion` are declared and read by nothing), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)

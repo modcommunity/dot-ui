@@ -25,6 +25,19 @@ const CHANNEL := "ui.hud"
 ## Hide it while any screen at all is open. For a game whose menus are opaque anyway.
 @export var hide_under_any_screen: bool = false
 
+@export_group("Fit")
+
+## The frame the HUD was laid out for, 1280x720 for the glance pieces ([DotHudPiece]).
+## Zero (the default) anchors the HUD to the whole rect as before. Set, the HUD is placed by
+## hand instead: on a frame smaller than this on either side the whole layer is scaled by
+## [method fit_scale], never laid out again, so every piece and every distance between
+## pieces shrinks together; on a larger frame nothing grows and the world gets the room.
+## Re-fitted when the viewport changes size.
+@export var fit_design: Vector2 = Vector2.ZERO
+
+## Below this the words are unreadable anyway; a frame that small gets overlap, not dust.
+@export_range(0.1, 1.0, 0.05) var fit_min: float = 0.5
+
 var _stack: DotScreenStack = null
 var _hidden_by_screen: bool = false
 var _hidden_by_game: bool = false
@@ -43,10 +56,47 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_apply_safe_area()
+	if fit_design != Vector2.ZERO:
+		get_viewport().size_changed.connect(_apply_safe_area)
+
+
+## How much a HUD laid out for [param design] is scaled on a frame [param frame] pixels:
+## 1 at [param design] and up, the short side's share of it below, never under
+## [param minimum]. game-arena found the need standalone at 854x480, where the challenge ran
+## over the scores and the ability bar over the health; a client shell draws on a 1280x720
+## canvas stretched to its window, so this is the same answer the shell gives.
+static func fit_scale(frame: Vector2, design: Vector2 = Vector2(1280.0, 720.0), minimum: float = 0.5) -> float:
+	if design.x <= 0.0 or design.y <= 0.0:
+		return 1.0
+	return clampf(minf(frame.x / design.x, frame.y / design.y), minimum, 1.0)
+
+
+## The scale [method fit_to_frame] last applied; 1 while [member fit_design] is zero.
+func fit() -> float:
+	return scale.x
+
+
+## Lays the HUD out on a frame [param frame] pixels: inset by the safe area and scaled by
+## [method fit_scale], in units that are [member fit_design] or more however small the
+## frame. Public so a suite can lay it out on a frame it does not have (a headless one is
+## 64 px). The inset is in the HUD's own units, so it scales with it.
+func fit_to_frame(frame: Vector2) -> void:
+	if config == null:
+		config = DotUiConfig.new()
+	var k := fit_scale(frame, fit_design, fit_min)
+	var inset := config.safe_area * config.scale
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
+	scale = Vector2(k, k)
+	position = Vector2(inset, inset) * k
+	size = frame / k - Vector2(inset, inset) * 2.0
 
 
 ## Applies the configured inset, so nothing sits under a notch or off a television.
 func _apply_safe_area() -> void:
+	if fit_design != Vector2.ZERO:
+		fit_to_frame(get_viewport_rect().size if is_inside_tree() else fit_design)
+		return
+
 	var inset := config.safe_area * config.scale
 
 	offset_left = inset
@@ -137,4 +187,5 @@ func describe() -> Dictionary:
 		"hidden_by_screen": _hidden_by_screen,
 		"hidden_by_game": _hidden_by_game,
 		"bound": _stack != null,
+		"fit": scale.x,
 	}

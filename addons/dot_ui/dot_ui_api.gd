@@ -12,5 +12,9 @@ extends RefCounted
 #    "(wheel up)" beside a "Mouse 4" can ask for this level before dropping it.
 # 3: DotChatWindow honours the player's own block list: self_mute, self_mute_enabled,
 #    self_mute_colour, is_self_muted(); `!sm` / `/sm` are run and never emitted.
-const LEVEL := 3
+# 4: the glance pieces: DotHudPiece (theme colours, footprint, cover_mode, cover_rects,
+#    covered_rect), DotVitals, DotAmmoCounter, DotScoreStrip, DotHitMarker,
+#    DotDamageNumbers, DotKeyPrompt, DotKeyHints; DotHud.fit_design, fit_min, fit_scale,
+#    fit, fit_to_frame; DotUiTheme.highlight and the DotHudPiece theme colours.
+const LEVEL := 4
 const OLDEST := 1

@@ -27,6 +27,7 @@ var _hud: DotHud = null
 var _chat: DotChatWindow = null
 var _ballot: DotBallotPanel = null
 var _result: DotBallotPanel = null
+var _pieces: Control = null
 var _shots: Array[Dictionary] = []
 var _at := 0
 var _wait := SETTLE
@@ -87,6 +88,18 @@ func _initialize() -> void:
 		# show their avatar on that row. A game vote with one player on it does exactly this,
 		# and a frame of it once showed the avatar a row short of the marked choice.
 		{"id": &"", "file": "ballot_result.png", "result": true},
+		# The glance pieces (DotVitals, DotAmmoCounter, DotScoreStrip, DotHitMarker,
+		# DotDamageNumbers, DotKeyPrompt, DotKeyHints) laid out the way game-arena lays them
+		# out, over a pale floor with a dark block, because pale ground is where the first
+		# arena HUD vanished. A cover stand-in down the right edge, where a client shell
+		# draws its ballots, sits over a right-hand hint column: that column must be dimmed.
+		{"id": &"", "file": "hud_pieces.png", "pieces": "dark"},
+		# The same in DotUiTheme.light(): every colour from the theme, dark numbers ringed in
+		# light.
+		{"id": &"", "file": "hud_pieces_light.png", "pieces": "light"},
+		# The same HUD fitted to 854x480 (drawn in the top-left of the 1280x800 window,
+		# inside the outline): scaled, never laid out again, so nothing may meet.
+		{"id": &"", "file": "hud_pieces_small.png", "pieces": "small"},
 	]
 
 
@@ -191,6 +204,119 @@ func _build_hud() -> void:
 	)
 
 
+## The glance pieces over a pale floor, the way game-arena places them. [param kind] is
+## "dark" (no theme: the defaults), "light" (DotUiTheme.light()) or "small" (fitted to
+## 854x480).
+func _build_pieces(kind: String) -> void:
+	if _pieces != null:
+		_pieces.free()
+	var frame := Vector2(854.0, 480.0) if kind == "small" else Vector2(1280.0, 800.0)
+	_pieces = Control.new()
+	_pieces.name = "Pieces"
+	_pieces.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pieces.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_pieces)
+
+	var black := ColorRect.new()
+	black.color = Color(0.0, 0.0, 0.0)
+	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pieces.add_child(black)
+	# Pale ground, the case that matters, with a dark block on the right third.
+	var floor_rect := ColorRect.new()
+	floor_rect.color = Color(0.88, 0.88, 0.85)
+	floor_rect.size = frame
+	_pieces.add_child(floor_rect)
+	for i in range(0, int(frame.x), 64):
+		var line := ColorRect.new()
+		line.color = Color(0.72, 0.72, 0.70)
+		line.position = Vector2(float(i), 0.0)
+		line.size = Vector2(2.0, frame.y)
+		_pieces.add_child(line)
+	var block := ColorRect.new()
+	block.color = Color(0.16, 0.18, 0.22)
+	block.position = Vector2(frame.x * 0.66, frame.y * 0.25)
+	block.size = Vector2(frame.x * 0.34, frame.y * 0.75)
+	_pieces.add_child(block)
+
+	var hud := DotHud.new()
+	hud.name = "PiecesHud"
+	hud.config = DotUiConfig.new()
+	hud.fit_design = Vector2(1280.0, 720.0)
+	if kind == "light":
+		hud.theme = DotUiTheme.light().build()
+	_pieces.add_child(hud)
+	hud.fit_to_frame(frame)
+
+	var vitals := DotVitals.new()
+	_place(hud, vitals, Control.PRESET_BOTTOM_LEFT, Rect2(0.0, -84.0, 380.0, 76.0))
+	# Under the 0.25 threshold, with armour: the low colour is the state worth seeing.
+	vitals.show_vitals(18.0, 100.0, 45.0, 100.0)
+
+	var ammo := DotAmmoCounter.new()
+	_place(hud, ammo, Control.PRESET_BOTTOM_RIGHT, Rect2(-300.0, -84.0, 290.0, 70.0))
+	ammo.show_ammo("Assault rifle", 7, 120, true)
+
+	var strip := DotScoreStrip.new()
+	_place(hud, strip, Control.PRESET_CENTER_TOP, Rect2(-260.0, 0.0, 520.0, 72.0))
+	strip.show_scores(23, 19, "BLUE", "RED", Color(0.22, 0.5, 0.95), Color(0.9, 0.24, 0.32))
+	strip.show_clock(DotScoreStrip.clock_text(47.0), true, "First to 25", "Team deathmatch")
+
+	var hints := DotKeyHints.new()
+	_place(hud, hints, Control.PRESET_CENTER_LEFT, Rect2(62.0, -128.0, 220.0, 120.0))
+	hints.show_hints([["Scoreboard", "Tab"], ["Vote", "F3"], ["Chat", "Y"], ["Throw", "Mouse back"]])
+
+	var prompt := DotKeyPrompt.new()
+	_place(hud, prompt, Control.PRESET_CENTER, Rect2(-330.0, 120.0, 300.0, 36.0))
+	prompt.show_prompt("Open door", "E")
+
+	var marker := DotHitMarker.new()
+	marker.kill_sec = 600.0
+	_place(hud, marker, Control.PRESET_FULL_RECT, Rect2())
+	marker.flash(true, false)
+
+	var numbers := DotDamageNumbers.new()
+	numbers.life_sec = 600.0
+	_place(hud, numbers, Control.PRESET_FULL_RECT, Rect2())
+	var centre := hud.size * 0.5
+	numbers.add_at(1, 27.0, centre + Vector2(140.0, 40.0))
+	numbers.add_at(2, 104.0, centre + Vector2(-170.0, 10.0), true)
+
+	# A client shell's ballot column, stand-in: in the cover group, over a right-hand hint
+	# column, which must come out dimmed.
+	var right_hints := DotKeyHints.new()
+	right_hints.align_right = true
+	_place(hud, right_hints, Control.PRESET_CENTER_RIGHT, Rect2(-280.0, -60.0, 270.0, 90.0))
+	right_hints.show_hints([["Under a ballot", "F4"], ["Dimmed", "F5"]])
+	var cover := ColorRect.new()
+	cover.color = Color(0.1, 0.12, 0.2, 0.55)
+	cover.add_to_group("dot_hud_cover")
+	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cover.position = Vector2(frame.x - 16.0 - minf(360.0, frame.x / 3.0), 110.0)
+	cover.size = Vector2(minf(360.0, frame.x / 3.0), frame.y * 0.45)
+	_pieces.add_child(cover)
+	var cover_label := Label.new()
+	cover_label.text = "cover stand-in\n(dot_hud_cover)"
+	cover_label.position = Vector2(12.0, 8.0)
+	cover.add_child(cover_label)
+
+	if kind == "small":
+		var edge := ReferenceRect.new()
+		edge.border_color = Color(1.0, 0.2, 0.8)
+		edge.border_width = 2.0
+		edge.editor_only = false
+		edge.size = frame
+		_pieces.add_child(edge)
+
+
+func _place(hud: Control, piece: Control, preset: Control.LayoutPreset, rect: Rect2) -> void:
+	piece.set_anchors_preset(preset)
+	piece.offset_left = rect.position.x
+	piece.offset_top = rect.position.y
+	piece.offset_right = rect.end.x
+	piece.offset_bottom = rect.end.y
+	hud.add_child(piece)
+
+
 func _build_ballot() -> void:
 	_ballot = DotBallotPanel.new()
 	_ballot.name = "Ballot"
@@ -287,6 +413,14 @@ func _process(_delta: float) -> bool:
 
 		if bool(shot.get("result", false)):
 			_build_result()
+
+		var pieces := str(shot.get("pieces", ""))
+		_hud.visible = pieces == ""
+		if pieces != "":
+			_build_pieces(pieces)
+		elif _pieces != null:
+			_pieces.free()
+			_pieces = null
 
 		# An empty id means "show nothing", which is how the HUD gets a frame of its own:
 		# the stack's `hides_below` takes it down under an opaque screen, deliberately.

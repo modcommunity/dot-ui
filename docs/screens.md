@@ -39,7 +39,7 @@ Pausing the tree pauses only the *local* simulation, which desynchronises it fro
 
 `DotPauseScreen` and `DotSettingsScreen`, in `screens/`, exist because four clients had each written the same forty lines (a centred `PanelContainer`, a heading, a column of `Button`s, a focus path) and differed only in the words on the buttons and the document the panel was bound to.
 
-Today game-arena and game-hungario use them; the other games are on dot-menu's Escape menu, which builds on this addon's primitives (`DotScreenStack`, `DotInputBinding`, `DotChatWindow`) and adds a designed look. **An extraction is finished when the last caller moves, and nothing in the extracted repository can tell you whether that happened.** The grep is `grep -rn 'extends DotScreen'` (and the screen class names) over the games.
+Today game-hungario uses them; game-arena moved to dot-menu's `DotMenu` on 2026-10-10 (game-arena f9aeaf9), and the other games are on dot-menu's Escape menu too, which builds on this addon's primitives (`DotScreenStack`, `DotInputBinding`, `DotChatWindow`) and adds a designed look. **An extraction is finished when the last caller moves, and nothing in the extracted repository can tell you whether that happened.** The grep is `grep -rn 'extends DotScreen'` (and the screen class names) over the games.
 
 **The settings source is an `Object` and is never named.** dot-ui depends on dot-core and nothing else, and a script that so much as *mentions* `DotSettingsManager` fails to compile in a project without dot-settings. The contract is two methods, `to_config()` and `absorb_config()`; that the screen also accepts a bare `DotConfig` is the proof the seam is real.
 
@@ -53,7 +53,7 @@ Today game-arena and game-hungario use them; the other games are on dot-menu's E
 
 ## The scoreboard screen
 
-`DotScoreboardScreen` is the Tab screen, shared: a title and a ranked `DotTableView`, with the **rows and the columns the game's** (`row_fn`, `columns`), because a deathmatch counts kills, an obstacle course points and an eating game mass. Transparent and non-blocking. game-arena still has its own `ScoreboardScreen`, which predates it; dot-menu's Tab scoreboard is what the other games use.
+`DotScoreboardScreen` is the Tab screen, shared: a title and a ranked `DotTableView`, with the **rows and the columns the game's** (`row_fn`, `columns`), because a deathmatch counts kills, an obstacle course points and an eating game mass. Transparent and non-blocking. game-hungario still has its own `ScoreboardScreen`, which predates it; dot-menu's Tab scoreboard is what the other games use, game-arena included since f9aeaf9.
 
 ## `DotSettingsPanel` must never show a secret
 

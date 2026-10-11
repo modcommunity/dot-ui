@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 283
+const CHECKS := 362
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 20
+const SECTIONS := 28
 
 var _passed := 0
 var _failed := 0
@@ -113,6 +113,14 @@ func _run() -> void:
 	_test_chat_window()
 	_test_ballot_panel()
 	_test_ballot_avatar_rows()
+	_test_hud_piece()
+	_test_hud_fit()
+	_test_vitals()
+	_test_ammo_counter()
+	_test_score_strip()
+	_test_hit_marker()
+	_test_damage_numbers()
+	_test_key_prompt_and_hints()
 	await _test_settings_screen()
 	await _test_scoreboard_screen()
 
@@ -212,6 +220,260 @@ func _close(a: float, b: float, what: String, epsilon: float = 0.01) -> bool:
 func _group(title: String) -> void:
 	print("")
 	print("%s" % title)
+
+
+# --- The glance pieces -------------------------------------------------------
+
+## A piece in the tree, laid out at [param rect] in this node's space.
+func _piece(piece: DotHudPiece, rect: Rect2) -> DotHudPiece:
+	piece.position = rect.position
+	piece.size = rect.size
+	add_child(piece)
+	return piece
+
+
+## Colours from the theme or the defaults, and what a piece does under a cover.
+func _test_hud_piece() -> void:
+	_section("hud piece: theme and cover")
+
+	var vitals := _piece(DotVitals.new(), Rect2(0.0, 600.0, 380.0, 76.0)) as DotVitals
+	vitals.show_vitals(60.0, 100.0)
+	_check(vitals.mouse_filter == Control.MOUSE_FILTER_IGNORE, "a piece never takes the click that fires the weapon")
+	_check(vitals.colour(&"low") == DotHudPiece.DEFAULTS[&"low"], "with no theme a piece draws in the defaults")
+	var palette := DotUiTheme.light()
+	palette.danger = Color(0.7, 0.1, 0.6)
+	vitals.theme = palette.build()
+	_check(vitals.colour(&"low") == palette.danger, "with a theme, in the theme's colours")
+	_check(vitals.colour(&"plate").a < 1.0, "and the plate is see-through, not a panel")
+	vitals.theme = null
+
+	_check(vitals.footprint().has_area(), "a piece says where it draws")
+	vitals.refresh_cover()
+	_check(not vitals.covered and vitals.self_modulate.a == 1.0, "nothing over it: drawn in full")
+
+	# A ballot stand-in, in the group by its string, over the piece's plate.
+	var cover := Control.new()
+	cover.position = Vector2(100.0, 580.0)
+	cover.size = Vector2(300.0, 200.0)
+	cover.add_to_group("dot_hud_cover")
+	add_child(cover)
+	_check(DotHudPiece.covered_rect(vitals).has_area(), "the cover is found by its group, in the piece's own space")
+	vitals.refresh_cover()
+	_check(vitals.covered, "a cover over its footprint is seen")
+	_close(vitals.self_modulate.a, vitals.cover_alpha, "and the piece dims under it, so the ballot reads")
+	vitals.cover_mode = DotHudPiece.CoverMode.HIDE
+	vitals.refresh_cover()
+	_close(vitals.self_modulate.a, 0.0, "or hides, when told to")
+	cover.visible = false
+	vitals.refresh_cover()
+	_check(not vitals.covered and vitals.self_modulate.a == 1.0, "a hidden cover covers nothing")
+	cover.visible = true
+	cover.position = Vector2(500.0, 580.0)
+	vitals.refresh_cover()
+	_check(not vitals.covered, "nor does one beside the footprint, inside the control's rect or not")
+	cover.position = Vector2(100.0, 580.0)
+	vitals.cover_mode = DotHudPiece.CoverMode.IGNORE
+	vitals.refresh_cover()
+	_check(not vitals.covered and vitals.self_modulate.a == 1.0, "IGNORE draws through it")
+
+	var marker := DotHitMarker.new()
+	_check(marker.cover_mode == DotHudPiece.CoverMode.IGNORE,
+		"the crosshair's pieces ignore covers: their rect is the whole HUD, which always meets one")
+	marker.free()
+
+	cover.queue_free()
+	vitals.queue_free()
+	_done()
+
+
+## The HUD scaled below the frame it was designed for, never laid out again.
+func _test_hud_fit() -> void:
+	_section("hud fit")
+
+	_close(DotHud.fit_scale(Vector2(1280.0, 720.0)), 1.0, "1280x720 is drawn as designed")
+	_close(DotHud.fit_scale(Vector2(1920.0, 1080.0)), 1.0, "a larger frame does not grow the HUD")
+	_close(DotHud.fit_scale(Vector2(854.0, 480.0)), 480.0 / 720.0, "854x480 scales by the short side's share")
+	_close(DotHud.fit_scale(Vector2(720.0, 1280.0)), 720.0 / 1280.0, "a portrait frame by its width")
+	_close(DotHud.fit_scale(Vector2(320.0, 180.0)), 0.5, "never under half")
+
+	var hud := DotHud.new()
+	hud.config = DotUiConfig.new()
+	hud.config.safe_area = 16.0
+	hud.fit_design = Vector2(1280.0, 720.0)
+	add_child(hud)
+	hud.fit_to_frame(Vector2(854.0, 480.0))
+	_close(hud.fit(), 480.0 / 720.0, "a HUD with a design frame scales itself")
+	_close(hud.position.x + (hud.size.x + 16.0) * hud.fit(), 854.0, "and still fills the frame, inset included", 0.5)
+	var ammo := DotAmmoCounter.new()
+	ammo.position = Vector2(100.0, 100.0)
+	ammo.size = Vector2(290.0, 70.0)
+	hud.add_child(ammo)
+	ammo.show_ammo("Rifle", 30, 90)
+	var on_screen := ammo.get_global_transform() * ammo.footprint()
+	_close(on_screen.size.x, ammo.footprint().size.x * hud.fit(), "a piece inside it is drawn at the HUD's scale", 0.5)
+	hud.fit_to_frame(Vector2(1600.0, 900.0))
+	_close(hud.fit(), 1.0, "and back at full size on a big frame")
+	hud.queue_free()
+	_done()
+
+
+func _test_vitals() -> void:
+	_section("vitals")
+
+	var v := _piece(DotVitals.new(), Rect2(0.0, 0.0, 380.0, 76.0)) as DotVitals
+	# Under the 0.25 threshold: the state the low colour exists for.
+	v.show_vitals(18.0, 100.0)
+	_check(v.is_low() and v.number_text() == "18", "18 of 100 is low, and says 18")
+	_close(v.shown_fraction(), 0.18, "the first value is drawn at once, not eased in from full")
+	var plain := v.footprint()
+	_check(plain.size.x > v.bar_end and plain.size.y == 56.0, "the plate reaches past the bar to the number")
+	v.show_vitals(0.4, 100.0)
+	_check(v.number_text() == "1", "0.4 is alive, and says 1, not 0")
+
+	v.show_vitals(100.0, 100.0)
+	v.advance(10.0)
+	v.show_vitals(50.0, 100.0)
+	_check(v.number_text() == "50", "the number is the value at once")
+	v.advance(0.03)
+	_check(v.shown_fraction() < 1.0 and v.shown_fraction() > 0.5, "the bar slides toward it", "%.3f" % v.shown_fraction())
+	v.advance(5.0)
+	_close(v.shown_fraction(), 0.5, "and arrives")
+	_check(not v.is_low(), "half is not low")
+
+	v.show_vitals(50.0, 100.0, 40.0, 100.0, 20.0)
+	_check(v.footprint().size.y == 72.0, "armour makes the plate taller for its bar")
+	_close(v.bonus, 20.0, "a bonus is kept beside the real health")
+	v.show_status("DOWN")
+	_check(v.number_text() == "DOWN", "a status replaces the number")
+	v.show_status("")
+	_check(v.number_text() == "50", "and clearing it brings the number back")
+	_check(int(v.describe().get("health", -1)) == 50, "describe() reports the health")
+	v.queue_free()
+	_done()
+
+
+func _test_ammo_counter() -> void:
+	_section("ammo counter")
+
+	var a := _piece(DotAmmoCounter.new(), Rect2(0.0, 0.0, 290.0, 70.0)) as DotAmmoCounter
+	_check(not a.footprint().has_area(), "nothing in hand draws nothing")
+	a.show_ammo("Rifle", 12, 90)
+	_check(a.count_text() == "12 | 90", "magazine | reserve")
+	var full := a.footprint()
+	_check(full.end.x <= a.size.x + 14.0 + 0.5 and full.size.y == 70.0, "right-aligned, on a plate for the name and the count")
+	a.show_ammo("Pistol", 7, 0, false, true)
+	_check(a.count_text() == "7 | ∞", "an endless reserve draws as one")
+	a.show_ammo("Pistol", 7, -1)
+	_check(a.count_text() == "7", "no reserve draws the magazine alone")
+	a.show_ammo("Knife", -1, -1)
+	_check(a.count_text() == "" and a.footprint().size.y == 32.0, "a weapon with no magazine shows its name alone")
+	a.show_ammo("Rifle", 3, 90, true)
+	_check(a.low, "the host says when it is low")
+	a.clear()
+	_check(not a.footprint().has_area(), "and clear() takes it down")
+	a.queue_free()
+	_done()
+
+
+func _test_score_strip() -> void:
+	_section("score strip")
+
+	_check(DotScoreStrip.clock_text(0.0) == "0:00", "0:00 at the end")
+	_check(DotScoreStrip.clock_text(59.2) == "1:00", "rounded up, so it never says 0:00 with time left")
+	_check(DotScoreStrip.clock_text(61.0) == "1:01", "M:SS")
+	_check(DotScoreStrip.clock_text(3661.0) == "1:01:01", "H:MM:SS from an hour")
+	_check(DotScoreStrip.clock_text(-4.0) == "0:00", "never negative")
+
+	var s := _piece(DotScoreStrip.new(), Rect2(0.0, 0.0, 520.0, 72.0)) as DotScoreStrip
+	_check(not s.footprint().has_area(), "nothing handed over draws nothing")
+	s.show_clock(DotScoreStrip.clock_text(95.0), false, "", "")
+	var clock_only := s.footprint()
+	_check(not s.sides and is_equal_approx(clock_only.size.x, DotScoreStrip.CLOCK_W), "a game with no scores gets the clock alone")
+	_close(clock_only.get_center().x, 260.0, "centred on the control's middle")
+	s.show_scores(12, 9, "BLUE", "RED", Color.BLUE, Color.RED)
+	_check(s.sides and s.footprint().size.x > clock_only.size.x * 2.0, "two sides put the plates either side of it")
+	s.show_clock("0:09", true, "First to 25", "Team deathmatch")
+	_check(s.under_text() == "First to 25   ·   Team deathmatch", "what wins and the mode, under them")
+	_check(s.footprint().size.y > DotScoreStrip.H, "and the footprint takes the line in")
+	s.hide_scores()
+	_check(not s.sides, "a mode with no sides takes the plates down")
+	s.queue_free()
+	_done()
+
+
+func _test_hit_marker() -> void:
+	_section("hit marker")
+
+	var m := _piece(DotHitMarker.new(), Rect2(0.0, 0.0, 400.0, 300.0)) as DotHitMarker
+	_check(m.alpha() == 0.0 and not m.footprint().has_area(), "nothing until a hit")
+	m.flash()
+	_close(m.alpha(), 1.0, "a confirmed hit flashes it")
+	_close(m.footprint().get_center().x, 200.0, "round the middle, where the crosshair is")
+	m.advance(m.hit_sec + 0.01)
+	_close(m.alpha(), 0.0, "and it is gone after hit_sec")
+	m.flash(true)
+	m.advance(0.05)
+	m.flash(false)
+	_check(m.kill, "a pellet after the lethal one does not turn the kill marker white")
+	_close(m.life, m.kill_sec, "and a kill holds longer than a hit")
+	m.advance(m.kill_sec)
+	m.flash(false, true)
+	_check(not m.kill and m.headshot, "after it fades, the next hit is its own")
+	m.queue_free()
+	_done()
+
+
+func _test_damage_numbers() -> void:
+	_section("damage numbers")
+
+	var d := _piece(DotDamageNumbers.new(), Rect2(0.0, 0.0, 400.0, 300.0)) as DotDamageNumbers
+	d.add_at(7, 20.0, Vector2(200.0, 150.0))
+	d.advance(0.1)
+	d.add_at(7, 15.0, Vector2(200.0, 150.0), true)
+	_check(d.texts() == PackedStringArray(["35"]), "a burst on one victim adds up into one number", str(d.texts()))
+	_check(bool(d.entries[0]["headshot"]), "and a headshot in it marks the total")
+	d.add_at(8, 9.0, Vector2(100.0, 150.0))
+	_check(d.entries.size() == 2, "another victim gets a number of its own")
+	_check(d.footprint().has_area(), "and they say where they draw")
+	d.advance(d.merge_sec + 0.05)
+	d.add_at(7, 5.0, Vector2(200.0, 150.0))
+	_check(d.entries.size() == 3, "a hit after merge_sec is a new number")
+	d.advance(d.life_sec + 0.01)
+	_check(d.entries.is_empty(), "every number fades out")
+	# A world point with no camera: headless, and a host that has not attached one yet.
+	d.add(9, 10.0, Vector3(0.0, 1.0, -5.0))
+	_check(not d.footprint().has_area(), "with no camera a world point is not drawn, and nothing fails")
+	d.clear()
+	_check(d.entries.is_empty(), "clear() empties it")
+	d.queue_free()
+	_done()
+
+
+func _test_key_prompt_and_hints() -> void:
+	_section("key prompt and hints")
+
+	var p := _piece(DotKeyPrompt.new(), Rect2(0.0, 0.0, 400.0, 40.0)) as DotKeyPrompt
+	p.show_prompt("Open door", "E")
+	_check(p.visible and p.text() == "Open door  E", "a prompt says what and which key")
+	_close(p.footprint().get_center().x, 200.0, "centred on its middle")
+	var with_key := p.footprint().size.x
+	p.show_prompt("Spent", "")
+	_check(p.text() == "Spent" and p.footprint().size.x < with_key, "a prompt with no key is the words alone")
+	p.clear()
+	_check(not p.visible and not p.footprint().has_area(), "nothing to say hides it")
+
+	var h := _piece(DotKeyHints.new(), Rect2(0.0, 0.0, 300.0, 200.0)) as DotKeyHints
+	h.show_hints([["Scoreboard", "Tab"], ["Vote", "F3"], ["Chat", "Y"]])
+	var left := h.footprint()
+	_check(is_equal_approx(left.size.y, 3.0 * h.row_height), "a row per hint")
+	_check(left.position.x == 0.0, "from the left edge by default")
+	h.align_right = true
+	_check(is_equal_approx(h.footprint().end.x, 300.0), "or to the right edge")
+	h.clear()
+	_check(not h.footprint().has_area(), "and clear() takes them down")
+	p.queue_free()
+	h.queue_free()
+	_done()
 
 
 # --- Fixtures --------------------------------------------------------------

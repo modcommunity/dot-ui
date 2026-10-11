@@ -153,9 +153,33 @@ func colour(key: StringName) -> Color:
 ## (and slanted when [param italic]). Bold, because a regular weight over a moving map
 ## reads as a debug overlay.
 func font(italic: bool = false) -> Font:
-	if has_theme_font(&"font", THEME_TYPE):
-		return get_theme_font(&"font", THEME_TYPE)
-	return bold_font(italic)
+	var themed := _theme_font()
+	return themed if themed != null else bold_font(italic)
+
+
+## The `font` a theme sets on [constant THEME_TYPE] itself, from this piece's own theme up
+## through its ancestors' to the project's; null when none does.
+##
+## [b]Not `has_theme_font`[/b], which is true for any name on any type as soon as a theme in
+## the chain has a default font, and the engine's own theme always has one: every piece drew
+## in the regular-weight fallback and never in [method bold_font] (game-arena's glance HUD,
+## rendered after the move, 2026-10-11). A font set on the type is asked for by name instead.
+## Private, so the API level does not move: a game sets the font through a theme.
+func _theme_font() -> Font:
+	var node: Node = self
+	while node != null:
+		var owned: Theme = null
+		if node is Control:
+			owned = (node as Control).theme
+		elif node is Window:
+			owned = (node as Window).theme
+		if owned != null and owned.get_font_list(THEME_TYPE).has("font"):
+			return owned.get_font(&"font", THEME_TYPE)
+		node = node.get_parent()
+	var project := ThemeDB.get_project_theme()
+	if project != null and project.get_font_list(THEME_TYPE).has("font"):
+		return project.get_font(&"font", THEME_TYPE)
+	return null
 
 
 ## The emboldened fallback font, shared by every piece.

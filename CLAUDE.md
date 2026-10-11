@@ -67,6 +67,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - `DotChatWindow` runs `!sm` / `/sm` itself and never emits them; `add_said` drops a self-muted speaker. The list is found by registry name or path, never named. [hud](docs/hud.md#the-chat-box)
 - A ballot's unconfirmed local click outranks a disagreeing server state for `PENDING_MS` on the same options; a closed result snaps the avatars. [hud](docs/hud.md#a-ballot-on-the-hud)
 - A glance piece takes values, never a game object; its colours are theme colours on `DotHudPiece` with `DEFAULTS` behind them; it says where it draws in `footprint()`. [hud](docs/hud.md#the-glance-pieces)
+- A piece's font is a `font` a theme sets on the type `DotHudPiece`, looked up by name; never `has_theme_font`, which is true whenever any theme has a default font (the engine's does). [hud](docs/hud.md#the-glance-pieces)
 - A piece tests each `dot_hud_cover` member on its own against its footprint, never the merged rect, and the full-rect pieces (hit marker, damage numbers) default to `IGNORE`. [hud](docs/hud.md#the-glance-pieces)
 - `DotHud.fit_design` scales the whole HUD below the design frame and never lays it out again; zero keeps the full-rect anchoring. [hud](docs/hud.md#the-glance-pieces)
 - A new piece or a new public method on one is an API level (`dot_ui_api.gd`): a delivered pack runs on the shell's dot-ui. [hud](docs/hud.md#the-glance-pieces)

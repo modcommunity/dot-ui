@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 362
+const CHECKS := 364
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -245,6 +245,16 @@ func _test_hud_piece() -> void:
 	vitals.theme = palette.build()
 	_check(vitals.colour(&"low") == palette.danger, "with a theme, in the theme's colours")
 	_check(vitals.colour(&"plate").a < 1.0, "and the plate is see-through, not a panel")
+	vitals.theme = null
+	# The engine's own theme has a default font, which made `has_theme_font` true for every
+	# name, so the pieces drew regular weight: the bold fallback is what no theme gives.
+	_check(vitals.font() == DotHudPiece.bold_font() and vitals._theme_font() == null,
+		"with no theme font on the type, a piece draws bold, not the engine's regular weight")
+	var with_font := Theme.new()
+	var chosen := SystemFont.new()
+	with_font.set_font(&"font", DotHudPiece.THEME_TYPE, chosen)
+	vitals.theme = with_font
+	_check(vitals.font() == chosen, "and a font a theme sets on the type replaces it")
 	vitals.theme = null
 
 	_check(vitals.footprint().has_area(), "a piece says where it draws")

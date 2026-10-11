@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 264
+const CHECKS := 271
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1447,6 +1447,55 @@ func _test_input_binding() -> void:
 	_check(
 		(DotInputBinding.from_text("Mouse 3") as InputEventMouseButton) != null,
 		"and comes back as a mouse button"
+	)
+
+	# The wheel and the side buttons are written by name (API level 2). Godot numbers the
+	# wheel 4 to 7, so "Mouse 4" was the wheel while a player reads it as the thumb button.
+	var expected := {
+		MOUSE_BUTTON_WHEEL_UP: "Wheel up", MOUSE_BUTTON_WHEEL_DOWN: "Wheel down",
+		MOUSE_BUTTON_WHEEL_LEFT: "Wheel left", MOUSE_BUTTON_WHEEL_RIGHT: "Wheel right",
+		MOUSE_BUTTON_XBUTTON1: "Mouse back", MOUSE_BUTTON_XBUTTON2: "Mouse forward",
+	}
+	var written: Array[String] = []
+	var read_back: Array[String] = []
+	for index in expected:
+		var named := InputEventMouseButton.new()
+		named.button_index = index as MouseButton
+		var text := DotInputBinding.to_text(named)
+		if text != str(expected[index]):
+			written.append("%d -> %s" % [index, text])
+		var again := DotInputBinding.from_text(str(expected[index])) as InputEventMouseButton
+		if again == null or again.button_index != index:
+			read_back.append(str(expected[index]))
+	_check(written.is_empty(), "the wheel and the side buttons are written by name", ", ".join(written))
+	_check(read_back.is_empty(), "and every name reads back as its own button", ", ".join(read_back))
+	var lower := DotInputBinding.from_text("  wheel DOWN ") as InputEventMouseButton
+	_check(
+		lower != null and lower.button_index == MOUSE_BUTTON_WHEEL_DOWN,
+		"a name typed by hand in any case still reads"
+	)
+
+	# The old spelling. Every binding stored before the names says "Mouse 4" for the wheel
+	# up; reading it as anything else rebinds a player's previous-weapon key on upgrade.
+	var old_up := DotInputBinding.from_text("Mouse 4") as InputEventMouseButton
+	var old_down := DotInputBinding.from_text("Mouse 5") as InputEventMouseButton
+	_check(
+		old_up != null and old_up.button_index == MOUSE_BUTTON_WHEEL_UP
+			and old_down != null and old_down.button_index == MOUSE_BUTTON_WHEEL_DOWN,
+		"the old \"Mouse 4\" / \"Mouse 5\" still read as the wheel",
+		"a stored binding from before the names would move to another button"
+	)
+	_check(
+		DotInputBinding.to_text(old_up) == "Wheel up",
+		"and an old binding is written back under its new name"
+	)
+	_check(
+		(DotInputBinding.from_text("Mouse 8") as InputEventMouseButton).button_index == MOUSE_BUTTON_XBUTTON1,
+		"a numbered side button still reads"
+	)
+	_check(
+		DotBindingsPanel.event_name(old_up) == "Wheel up",
+		"the rebinding screen draws the same word as the settings file"
 	)
 
 	_check(DotInputBinding.from_text("") == null, "nothing is bound to nothing")

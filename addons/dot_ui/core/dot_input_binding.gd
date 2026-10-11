@@ -17,7 +17,7 @@ extends RefCounted
 ## file that disagrees with their own keyboard.
 ##
 ## [codeblock]
-## DotInputBinding.to_text(event)          # "Y", "Space", "Shift+A", "Mouse 1"
+## DotInputBinding.to_text(event)          # "Y", "Space", "Shift+A", "Mouse 1", "Wheel up"
 ## DotInputBinding.from_text("Y")          # an InputEventKey on the physical Y
 ## DotInputBinding.ensure_action(&"chat_open", "Y")
 ## [/codeblock]
@@ -32,6 +32,26 @@ const CHANNEL := "ui.binding"
 
 ## What [method from_text] and [method to_text] call "nothing bound".
 const UNBOUND := ""
+
+## The mouse buttons that are written by name rather than as "Mouse N" (dot-ui API level 2).
+##
+## [b]Why names.[/b] Godot numbers the wheel as mouse buttons 4 to 7 and the two side
+## buttons as 8 and 9, so "Mouse 4" was the wheel turning up while every player reads it
+## as the thumb button (the one their mouse software calls "Mouse 4"). A Controls page
+## that says "Mouse 4" for previous weapon sends the player to the wrong button. The side
+## buttons are "Mouse back" / "Mouse forward" rather than "Mouse 4" / "Mouse 5" because
+## that spelling is already taken: a settings file written before these names says
+## "Mouse 4" and means the wheel, and [method from_text] still reads it that way.
+##
+## Left, right and middle stay "Mouse 1" to "Mouse 3": nobody misreads those.
+const MOUSE_NAMES := {
+	MOUSE_BUTTON_WHEEL_UP: "Wheel up",
+	MOUSE_BUTTON_WHEEL_DOWN: "Wheel down",
+	MOUSE_BUTTON_WHEEL_LEFT: "Wheel left",
+	MOUSE_BUTTON_WHEEL_RIGHT: "Wheel right",
+	MOUSE_BUTTON_XBUTTON1: "Mouse back",
+	MOUSE_BUTTON_XBUTTON2: "Mouse forward",
+}
 
 
 ## A binding as text. Empty for anything with no short form.
@@ -51,7 +71,7 @@ static func to_text(event: InputEvent) -> String:
 		return OS.get_keycode_string(code | _modifier_mask(key))
 
 	if event is InputEventMouseButton:
-		return "Mouse %d" % (event as InputEventMouseButton).button_index
+		return mouse_text((event as InputEventMouseButton).button_index)
 
 	if event is InputEventJoypadButton:
 		return "Pad %d" % (event as InputEventJoypadButton).button_index
@@ -61,6 +81,11 @@ static func to_text(event: InputEvent) -> String:
 		return "Axis %d%s" % [motion.axis, "+" if motion.axis_value > 0.0 else "-"]
 
 	return UNBOUND
+
+
+## A mouse button as text: its name from [constant MOUSE_NAMES], else "Mouse N".
+static func mouse_text(button_index: int) -> String:
+	return str(MOUSE_NAMES.get(button_index, "Mouse %d" % button_index))
 
 
 ## The event a binding string names, or null.
@@ -74,6 +99,17 @@ static func from_text(text: String) -> InputEvent:
 	if trimmed == UNBOUND:
 		return null
 
+	# Names first, case-blind, because a person types these by hand. "Mouse back" also
+	# starts with "Mouse ", and the number parse below would read it as button 0.
+	var lowered := trimmed.to_lower()
+	for index in MOUSE_NAMES:
+		if str(MOUSE_NAMES[index]).to_lower() == lowered:
+			var named := InputEventMouseButton.new()
+			named.button_index = index as MouseButton
+			return named
+
+	# "Mouse N" is still read for every N, wheel included: it is what every binding was
+	# stored as before MOUSE_NAMES, so "Mouse 4" in an old settings file is the wheel up.
 	if trimmed.begins_with("Mouse "):
 		var button := InputEventMouseButton.new()
 		button.button_index = trimmed.substr(6).strip_edges().to_int() as MouseButton

@@ -231,8 +231,9 @@ static func event_name(event: InputEvent) -> String:
 		var code := key.physical_keycode if key.physical_keycode != 0 else key.keycode
 		return OS.get_keycode_string(code)
 
+	# DotInputBinding's names, so this button and a settings file say the same word.
 	if event is InputEventMouseButton:
-		return "Mouse %d" % (event as InputEventMouseButton).button_index
+		return DotInputBinding.mouse_text((event as InputEventMouseButton).button_index)
 
 	if event is InputEventJoypadButton:
 		return "Pad %d" % (event as InputEventJoypadButton).button_index

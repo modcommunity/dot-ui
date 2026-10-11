@@ -53,6 +53,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - `DotSettingsPanel` never shows a secret (`show_sensitive` off), commits text on submit/focus-out, and rolls back every edit on a failed `apply()`. [screens](docs/screens.md#dotsettingspanel-must-never-show-a-secret)
 - Bindings compare by physical keycode; an action left with no events resets to default; escape cancels capture; an absent `bindings` key is a failure; `ui_*` hidden. Sort `StringName`s as Strings. [screens](docs/screens.md#dotbindingspanel-three-things-a-naive-rebinder-gets-wrong)
 - `DotInputBinding.apply` replaces, never adds; `ensure_action` never overwrites a player's choice; its vocabulary is `event_name`'s. [screens](docs/screens.md#dotinputbinding-one-binding-as-a-short-string)
+- The wheel and side buttons are written by name (`Wheel up`, `Mouse back`), and the old `Mouse 4` must keep reading as the wheel; a rename here is an API level. [screens](docs/screens.md#dotinputbinding-one-binding-as-a-short-string)
 
 **Widgets**
 

@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 364
+const CHECKS := 371
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -962,6 +962,25 @@ func _test_crosshair() -> void:
 	spread[0] = 80.0
 	crosshair.refresh()
 	_close(crosshair.gap_pixels(), 200.0, "and it is capped")
+
+	# Aiming down the sights: the crosshair fades out, and back, never snaps.
+	var aim := [0.0]
+	crosshair.aim_source = func() -> float: return aim[0]
+	crosshair.follow_aim(1.0)
+	_close(crosshair.aim_opacity, 1.0, "at the hip the crosshair is all there")
+	aim[0] = 1.0
+	crosshair.follow_aim(0.016)
+	_check(crosshair.aim_opacity > 0.0 and crosshair.aim_opacity < 1.0,
+		"aiming fades it rather than snapping it off", "%.2f" % crosshair.aim_opacity)
+	crosshair.follow_aim(1.0)
+	_close(crosshair.aim_opacity, 0.0, "and fully aimed it is gone")
+	_close(DotCrosshair.opacity_for_aim(0.25, 0.5), 0.5, "halfway to aim_hide_by it is half drawn")
+	aim[0] = 0.0
+	crosshair.follow_aim(0.016)
+	_check(crosshair.aim_opacity < 1.0, "a released aim fades it back in too")
+	crosshair.follow_aim(1.0)
+	_close(crosshair.aim_opacity, 1.0, "and it returns whole")
+	_close(DotCrosshair.opacity_for_aim(NAN), 1.0, "a NaN aim draws the crosshair rather than hiding it")
 
 	crosshair.queue_free()
 	remove_child(crosshair)

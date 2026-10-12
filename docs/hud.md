@@ -31,6 +31,10 @@ A crosshair that opens by an arbitrary factor is *worse* than a fixed one: it te
 
 `suppressed`, not `hidden`: `Control` already has a `hidden` and redefining it is a parse error. It is also not `visible`, deliberately: a scoped crosshair keeps refreshing so a game reading `gap_pixels()` for a scope reticle still gets an answer.
 
+## The crosshair fades while aiming down sights
+
+Christian's first play test (2026-10-11): the dot crosshair stayed on over the iron sight, two aiming marks that disagree. `aim_source` is a `func() -> float` returning the weapon's aim fraction (zee-dot-weapons' `ZeeViewModel.aim_fraction`, bound by the game, because this addon names nothing outside dot-core), or a game pushes it with `set_aim`. The crosshair's opacity is `opacity_for_aim(fraction, aim_hide_by)`: 1 at the hip, gone by `aim_hide_by` (0.5, halfway up the raise, when the sight is what the player looks through), eased with a smoothstep; `aim_opacity` then follows that over `aim_fade_sec` (0.08 s), so a weapon switch that drops the fraction to 0 at once still fades the crosshair back in rather than snapping it. The aim fraction is itself a ramp over the weapon's aim time, so the fade tracks the raise. A scope is unaffected: the game still hides the crosshair for its own reticle. `opacity_for_aim` is static for a game that draws its own dot.
+
 ## `DotTableView`
 
 A `VBoxContainer` of `HBoxContainer`s, never a `GridContainer`: a grid gives every column the same width whatever ratio a cell asks for (`size_flags_stretch_ratio` is read by a `BoxContainer` and nothing else). The columns line up across rows because every row is built from the same ratios at the same width.

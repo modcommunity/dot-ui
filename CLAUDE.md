@@ -60,6 +60,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - `DotUiTheme.build()` returns a fresh `Theme` every call. [hud](docs/hud.md#ships-no-art-names-nothing-outside-dot-core)
 - Widgets pull on a throttle; `refresh_on_change` where lateness is a lie. A stat bar eases the bar, never the number, exponentially. [hud](docs/hud.md#widgets-pull-and-the-throttle-is-the-point)
 - The crosshair gap is the real projection at the real FOV; `suppressed`, not `hidden` or `visible`. [hud](docs/hud.md#the-crosshair-does-the-real-projection)
+- The crosshair fades out while aiming down sights through `aim_source` (the view model's aim fraction) or `set_aim`, never snapped; a game with its own dot uses `opacity_for_aim`. [hud](docs/hud.md#the-crosshair-fades-while-aiming-down-sights)
 - `DotTableView` is boxes, never a grid; an absent width is an equal share, zero shrinks to content. [hud](docs/hud.md#dottableview)
 - A control built in code: use `set_anchors_and_offsets_preset`, or set all four offsets after the anchors. [hud](docs/hud.md#the-chat-box)
 - Never consume every key in `_input` (it starves a focused `LineEdit`); the ballot takes only its number keys, and none while a text field has focus. [hud](docs/hud.md#the-chat-box)

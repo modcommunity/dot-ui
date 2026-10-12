@@ -63,6 +63,25 @@ extends DotHudWidget
 ## answer. (`hidden` is taken — [Control] already has one.)
 @export var suppressed: bool = false
 
+@export_group("Aiming")
+
+## Aim fraction (0 at the hip, 1 fully aimed) at which the crosshair has faded out entirely.
+## Halfway up by default: the sight is what the player looks through by then, and a crosshair
+## over an iron sight is two aiming marks that disagree (Christian's first play test).
+@export_range(0.05, 1.0, 0.05) var aim_hide_by: float = 0.5
+
+## Seconds the fade takes to follow a jump in the aim fraction (a weapon switch drops it to 0 at
+## once): a fade, never a snap, both ways.
+@export_range(0.0, 1.0, 0.01) var aim_fade_sec: float = 0.08
+
+## `func() -> float`: the weapon's aim fraction, read every frame (a view model's
+## `aim_fraction`). Unset is never aimed, unless [method set_aim] is called.
+var aim_source: Callable = Callable()
+
+## How much of the crosshair is drawn now, 0..1, after the fade.
+var aim_opacity: float = 1.0
+
+var _aim: float = 0.0
 var _spread_degrees: float = 0.0
 var _hit_until_ms: int = 0
 
@@ -87,8 +106,38 @@ func flash_hit() -> void:
 	queue_redraw()
 
 
+## Pushes the aim fraction, for a game that has no callable to hand over.
+func set_aim(fraction: float) -> void:
+	_aim = clampf(fraction, 0.0, 1.0) if is_finite(fraction) else 0.0
+
+
+## How much crosshair an aim fraction leaves: 1 at the hip, 0 from [param hide_by] up, eased.
+## Static so a game drawing its own dot can fade it the same way.
+static func opacity_for_aim(fraction: float, hide_by: float = 0.5) -> float:
+	if not is_finite(fraction):
+		return 1.0
+	return 1.0 - smoothstep(0.0, maxf(hide_by, 0.001), clampf(fraction, 0.0, 1.0))
+
+
+## Moves [member aim_opacity] toward what the aim says, over [member aim_fade_sec]. Public so a
+## suite can step it without a frame.
+func follow_aim(delta: float) -> void:
+	if aim_source.is_valid():
+		var v: Variant = aim_source.call()
+		set_aim(float(v) if (v is float or v is int) else 0.0)
+	var target := opacity_for_aim(_aim, aim_hide_by)
+	var was := aim_opacity
+	if aim_fade_sec <= 0.0:
+		aim_opacity = target
+	else:
+		aim_opacity = move_toward(aim_opacity, target, delta / aim_fade_sec)
+	if not is_equal_approx(was, aim_opacity):
+		queue_redraw()
+
+
 func _process(delta: float) -> void:
 	super._process(delta)
+	follow_aim(delta)
 
 	if _hit_until_ms > 0 and Time.get_ticks_msec() >= _hit_until_ms:
 		_hit_until_ms = 0
@@ -116,12 +165,14 @@ func gap_pixels() -> float:
 
 
 func _draw() -> void:
-	if suppressed:
+	if suppressed or aim_opacity <= 0.01:
 		return
 
 	var centre := size * 0.5
 	var gap := gap_pixels()
 	var tint := hit_colour if _hit_until_ms > 0 else colour
+	tint.a *= aim_opacity
+	var edge := Color(outline_colour, outline_colour.a * aim_opacity)
 
 	var arms: Array[Vector2] = [Vector2.LEFT, Vector2.RIGHT, Vector2.DOWN]
 
@@ -133,7 +184,7 @@ func _draw() -> void:
 			draw_line(
 				centre + direction * gap,
 				centre + direction * (gap + length),
-				outline_colour,
+				edge,
 				thickness + 2.0
 			)
 
@@ -149,7 +200,7 @@ func _draw() -> void:
 		return
 
 	if outline:
-		draw_circle(centre, dot_radius + 1.0, outline_colour)
+		draw_circle(centre, dot_radius + 1.0, edge)
 
 	draw_circle(centre, dot_radius, tint)
 
@@ -159,4 +210,6 @@ func describe() -> Dictionary:
 	out["spread"] = _spread_degrees
 	out["gap"] = gap_pixels()
 	out["suppressed"] = suppressed
+	out["aim"] = _aim
+	out["aim_opacity"] = aim_opacity
 	return out

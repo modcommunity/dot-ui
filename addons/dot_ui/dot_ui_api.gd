@@ -16,5 +16,7 @@ extends RefCounted
 #    covered_rect), DotVitals, DotAmmoCounter, DotScoreStrip, DotHitMarker,
 #    DotDamageNumbers, DotKeyPrompt, DotKeyHints; DotHud.fit_design, fit_min, fit_scale,
 #    fit, fit_to_frame; DotUiTheme.highlight and the DotHudPiece theme colours.
-const LEVEL := 4
+# 5: DotCrosshair fades out while aiming down sights: aim_source, set_aim(), aim_hide_by,
+#    aim_fade_sec, aim_opacity, follow_aim(), opacity_for_aim().
+const LEVEL := 5
 const OLDEST := 1

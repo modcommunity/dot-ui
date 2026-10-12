@@ -68,6 +68,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - `DotChatWindow` runs `!sm` / `/sm` itself and never emits them; `add_said` drops a self-muted speaker. The list is found by registry name or path, never named. [hud](docs/hud.md#the-chat-box)
 - A ballot's unconfirmed local click outranks a disagreeing server state for `PENDING_MS` on the same options; a closed result snaps the avatars. [hud](docs/hud.md#a-ballot-on-the-hud)
 - A glance piece takes values, never a game object; its colours are theme colours on `DotHudPiece` with `DEFAULTS` behind them; it says where it draws in `footprint()`. [hud](docs/hud.md#the-glance-pieces)
+- The default HUD is dark (deep plates, dark key caps, tinted score plates); the bright look is a theme, never the default. A layer's look is one `Theme` on its root (`DotHudPiece.theme_from`), replaced live, never a walk of the pieces; a game's accent theme sets `highlight`/`plate_edge` and leaves plate, text and ink to the theme. [hud](docs/hud.md#the-glance-pieces)
 - A piece's font is a `font` a theme sets on the type `DotHudPiece`, looked up by name; never `has_theme_font`, which is true whenever any theme has a default font (the engine's does). [hud](docs/hud.md#the-glance-pieces)
 - A piece tests each `dot_hud_cover` member on its own against its footprint, never the merged rect, and the full-rect pieces (hit marker, damage numbers) default to `IGNORE`. [hud](docs/hud.md#the-glance-pieces)
 - `DotHud.fit_design` scales the whole HUD below the design frame and never lays it out again; zero keeps the full-rect anchoring. [hud](docs/hud.md#the-glance-pieces)
@@ -87,7 +88,8 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | How chat is sent and received | `DotChatWindow.submitted` and `add_message`; `open_action`, `max_lines`, margins, `outline_size` |
 | What a ballot choice does | `DotBallotPanel.chosen` |
 | Health, ammunition, the clock and scores, hit feedback, key prompts | the glance pieces' `show_*` / `flash` / `add`; `cover_mode`; theme colours on `DotHudPiece` |
-| Scaling a HUD on a small frame | `DotHud.fit_design`, `fit_scale`, `fit_to_frame` |
+| Scaling a HUD on a small frame, or to the player's size | `DotHud.fit_design`, `fit_scale`, `fit_to_frame`; `user_scale`, `fit_control` |
+| A whole HUD layer's colours, switched live | `DotHudPiece.theme_from` on the layer's root (dot-menu's `follow_hud` does it per theme) |
 | Keeping a game's HUD out from under a ballot | read the visible members of the `dot_hud_cover` group by that string ([hud](docs/hud.md#a-ballot-on-the-hud)) |
 
 Deliberately not here: transitions (`transition_sec` and `reduced_motion` are declared and read by nothing), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)

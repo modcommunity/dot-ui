@@ -38,6 +38,19 @@ const CHANNEL := "ui.hud"
 ## Below this the words are unreadable anyway; a frame that small gets overlap, not dust.
 @export_range(0.1, 1.0, 0.05) var fit_min: float = 0.5
 
+## The player's own HUD size (dot-menu's `hud_scale` setting), multiplying the fit: 1 is the
+## design, 0.8 a smaller HUD, 1.25 a larger one. Set, it lays the HUD out by hand as
+## [member fit_design] does, so a HUD with no design frame is scaled about its top-left
+## corner over a rect the frame's size divided by it, and its anchors still reach the edges.
+var user_scale: float = 1.0:
+	set(value):
+		var v := clampf(value, 0.25, 4.0)
+		if is_equal_approx(v, user_scale):
+			return
+		user_scale = v
+		if is_inside_tree() and not Engine.is_editor_hint():
+			_apply_safe_area()
+
 var _stack: DotScreenStack = null
 var _hidden_by_screen: bool = false
 var _hidden_by_game: bool = false
@@ -56,8 +69,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_apply_safe_area()
-	if fit_design != Vector2.ZERO:
-		get_viewport().size_changed.connect(_apply_safe_area)
+	get_viewport().size_changed.connect(_apply_safe_area)
 
 
 ## How much a HUD laid out for [param design] is scaled on a frame [param frame] pixels:
@@ -83,21 +95,40 @@ func fit() -> float:
 func fit_to_frame(frame: Vector2) -> void:
 	if config == null:
 		config = DotUiConfig.new()
-	var k := fit_scale(frame, fit_design, fit_min)
+	var k := (fit_scale(frame, fit_design, fit_min) if fit_design != Vector2.ZERO else 1.0) * user_scale
 	var inset := config.safe_area * config.scale
-	set_anchors_preset(Control.PRESET_TOP_LEFT)
-	scale = Vector2(k, k)
-	position = Vector2(inset, inset) * k
-	size = frame / k - Vector2(inset, inset) * 2.0
+	fit_control(self, frame, k, inset)
+
+
+## Lays [param control] out over a frame [param frame] pixels at scale [param k], inset by
+## [param inset] of its own units: top-left anchored, scaled, and sized to the frame divided
+## by the scale, so its children's anchors still reach the frame's edges. What
+## [method fit_to_frame] does to a [DotHud], for a game whose HUD root is a plain [Control]
+## under a [CanvasLayer] (dot-menu's `hud_scale` uses it). Public and static so a suite can
+## lay one out on a frame it does not have.
+static func fit_control(control: Control, frame: Vector2, k: float, inset: float = 0.0) -> void:
+	if control == null or k <= 0.0:
+		return
+	control.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	control.scale = Vector2(k, k)
+	control.position = Vector2(inset, inset) * k
+	control.size = frame / k - Vector2(inset, inset) * 2.0
 
 
 ## Applies the configured inset, so nothing sits under a notch or off a television.
 func _apply_safe_area() -> void:
-	if fit_design != Vector2.ZERO:
-		fit_to_frame(get_viewport_rect().size if is_inside_tree() else fit_design)
+	if fit_design != Vector2.ZERO or not is_equal_approx(user_scale, 1.0):
+		var design := fit_design if fit_design != Vector2.ZERO else Vector2(1280.0, 720.0)
+		fit_to_frame(get_viewport_rect().size if is_inside_tree() else design)
 		return
 
+	if config == null:
+		config = DotUiConfig.new()
 	var inset := config.safe_area * config.scale
+	# Back from a player's own size to the design: full-rect anchoring again.
+	if scale != Vector2.ONE:
+		scale = Vector2.ONE
+		set_anchors_preset(Control.PRESET_FULL_RECT)
 
 	offset_left = inset
 	offset_top = inset
@@ -188,4 +219,5 @@ func describe() -> Dictionary:
 		"hidden_by_game": _hidden_by_game,
 		"bound": _stack != null,
 		"fit": scale.x,
+		"user_scale": user_scale,
 	}

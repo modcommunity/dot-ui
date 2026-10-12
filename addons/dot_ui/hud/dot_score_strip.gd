@@ -99,7 +99,7 @@ func _draw() -> void:
 		_side(Rect2(clock_rect.end.x + GAP, 0.0, PLATE_W, H), right_colour, right_tag, right_score)
 	if clock != "" or sides:
 		var plate := colour(&"plate")
-		ink_plate(clock_rect, Color(plate, minf(plate.a + 0.2, 1.0)), 8, Color(1, 1, 1, 0.22), 1)
+		ink_plate(clock_rect, Color(plate, minf(plate.a + 0.2, 1.0)), 8, colour(&"plate_edge"), 1)
 		ink_text(Vector2(clock_rect.position.x, clock_rect.end.y - 12.0), clock, 26,
 			colour(&"low") if clock_low else colour(&"text"), HORIZONTAL_ALIGNMENT_CENTER, CLOCK_W, 5)
 	var under := under_text()
@@ -108,11 +108,22 @@ func _draw() -> void:
 
 
 func _side(rect: Rect2, fill: Color, tag: String, score: int) -> void:
-	ink_plate(rect, Color(fill.darkened(0.15), 0.9), 8, Color(1, 1, 1, 0.35), 1)
-	# A lighter top half: the plates read as buttons, not as flat paint.
-	ink_plate(Rect2(rect.position + Vector2(2.0, 2.0), Vector2(rect.size.x - 4.0, rect.size.y * 0.45)), Color(1, 1, 1, 0.12), 6, Color(0, 0, 0, 0), 0)
+	# How much of the side's colour fills the plate is the theme's (`team_fill`): the dark HUD
+	# tints its own dark plate and draws the colour as the edge and a bar along the top, so
+	# two sides still read at a glance without two slabs of saturated paint over the world;
+	# the bright theme paints the plate, as the first arena HUD did.
+	var k := clampf(float(number(&"team_fill")) / 100.0, 0.0, 1.0)
+	var plate := colour(&"plate")
+	var body := Color(plate.lerp(fill.darkened(0.15), k), lerpf(maxf(plate.a, 0.8), 0.9, k))
+	ink_plate(rect, body, 8, Color(fill.lightened(0.15), 0.9) if k < 0.8 else Color(1, 1, 1, 0.35), 2 if k < 0.8 else 1)
+	if k < 0.8:
+		ink_plate(Rect2(rect.position + Vector2(6.0, 2.0), Vector2(rect.size.x - 12.0, 3.0)), Color(fill.lightened(0.2), 0.95), 2, Color(0, 0, 0, 0), 0)
+	else:
+		# A lighter top half: the plates read as buttons, not as flat paint.
+		ink_plate(Rect2(rect.position + Vector2(2.0, 2.0), Vector2(rect.size.x - 4.0, rect.size.y * 0.45)), Color(1, 1, 1, 0.12), 6, Color(0, 0, 0, 0), 0)
 	if tag != "":
-		ink_text(Vector2(rect.position.x, rect.position.y + 13.0), tag, 11, Color(1, 1, 1, 0.9), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 3)
+		var tag_colour := Color(1, 1, 1, 0.9) if k >= 0.8 else Color(fill.lightened(0.45), 0.95)
+		ink_text(Vector2(rect.position.x, rect.position.y + 15.0), tag, 11, tag_colour, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 3)
 	ink_text(Vector2(rect.position.x, rect.end.y - 7.0), str(score), 26, colour(&"text"), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 5)
 
 

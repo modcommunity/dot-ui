@@ -16,10 +16,10 @@ extends Control
 ## tiles, and health, ammunition and the key hints all but vanished.
 ##
 ## [b]Coloured by the theme, with defaults that need none.[/b] Each colour is looked up as
-## a theme colour on the type [constant THEME_TYPE] (`plate`, `plate_edge`, `text`, `dim`,
-## `low`, `good`, `highlight`, `ink`, `keycap`, `keycap_text`), and an absent one is the
-## matching entry of [constant DEFAULTS]. `DotUiTheme.build()` fills every one from its
-## palette; a game with a designed [Theme] sets the ones it cares about.
+## a theme colour on the type [constant THEME_TYPE] ([constant COLOUR_KEYS]), and an absent
+## one is the matching entry of [constant DEFAULTS]. `DotUiTheme.build()` fills every one
+## from its palette, dot-menu's themes through [method theme_from], live; a game with a
+## designed [Theme] sets the ones it cares about.
 ##
 ## [b]Scaled by the HUD, never laid out again.[/b] Every number here is in the HUD's own
 ## units: a [DotHud] with a [member DotHud.fit_design] scales the whole layer on a frame
@@ -41,20 +41,38 @@ const COVER_GROUP := "dot_hud_cover"
 ## The theme type every piece reads its colours from.
 const THEME_TYPE := &"DotHudPiece"
 
-## What each colour is without a theme: the arena HUD's, which was judged by eye over
-## bright and dark maps (game-arena, 2026-10-10).
+## What each colour is without a theme: the dark HUD, deep translucent plates under bold
+## white text ringed in black (Christian's first play test, 2026-10-11: the pale plates,
+## white key caps and saturated score plates before this read as a toy over a pale map).
+## dot-menu's default theme draws the same; the old bright look is its "Arcade" theme.
 const DEFAULTS := {
-	&"plate": Color(0.06, 0.07, 0.11, 0.62),
-	&"plate_edge": Color(1.0, 1.0, 1.0, 0.14),
+	&"plate": Color(0.025, 0.03, 0.05, 0.74),
+	&"plate_edge": Color(1.0, 1.0, 1.0, 0.12),
 	&"text": Color(0.97, 0.98, 1.0),
-	&"dim": Color(0.82, 0.85, 0.92),
-	&"low": Color(1.0, 0.32, 0.28),
-	&"good": Color(0.45, 0.92, 0.55),
+	&"dim": Color(0.72, 0.76, 0.84),
+	&"low": Color(1.0, 0.34, 0.3),
+	&"good": Color(0.42, 0.9, 0.55),
 	&"highlight": Color(1.0, 0.8, 0.22),
-	&"ink": Color(0.02, 0.02, 0.05, 0.85),
-	&"keycap": Color(0.93, 0.94, 0.97, 0.95),
-	&"keycap_text": Color(0.08, 0.09, 0.14),
+	&"ink": Color(0.0, 0.0, 0.0, 0.9),
+	&"keycap": Color(0.13, 0.15, 0.2, 0.96),
+	&"keycap_text": Color(0.95, 0.96, 0.99),
+	&"keycap_edge": Color(1.0, 1.0, 1.0, 0.3),
 }
+
+## The theme constants a piece reads (ints, as a [Theme] holds them), and what each is
+## without one. `team_fill` is how much of a side's own colour fills its score plate, in
+## percent: the dark HUD tints a dark plate and edges it in the colour (38); the bright one
+## paints the plate (100).
+const DEFAULT_CONSTANTS := {
+	&"team_fill": 38,
+}
+
+## Every colour key a theme may set on [constant THEME_TYPE], in the order
+## [method theme_from] reads them.
+const COLOUR_KEYS: Array[StringName] = [
+	&"plate", &"plate_edge", &"text", &"dim", &"low", &"good", &"highlight", &"ink",
+	&"keycap", &"keycap_text", &"keycap_edge",
+]
 
 ## What a piece does while a cover meets its footprint.
 enum CoverMode {
@@ -149,6 +167,39 @@ func colour(key: StringName) -> Color:
 	return DEFAULTS.get(key, Color.WHITE)
 
 
+## A theme constant by name: the theme's, or [constant DEFAULT_CONSTANTS].
+func number(key: StringName) -> int:
+	if has_theme_constant(key, THEME_TYPE):
+		return get_theme_constant(key, THEME_TYPE)
+	return int(DEFAULT_CONSTANTS.get(key, 0))
+
+
+## A [Theme] for a whole HUD layer from [param colours] (keys of [constant COLOUR_KEYS]; one
+## left out is not set, so it falls through to a theme further up or to [constant DEFAULTS])
+## and [param constants] ([constant DEFAULT_CONSTANTS]' keys).
+##
+## [b]It also styles a plain [Label] under the layer[/b]: the theme's text colour, outlined
+## in its ink. A game's own HUD lines (a round's state, a course's name) are Labels, and
+## the first play test found them pale and unreadable over pale maps in four games; a
+## Label with its own colour override keeps it, and still gets the outline.
+##
+## This is what dot-menu's themes hand a game's HUD root, and what [DotUiTheme] fills; a
+## game sets it on the node above its pieces and every piece and Label below follows.
+static func theme_from(colours: Dictionary, constants: Dictionary = {}) -> Theme:
+	var t := Theme.new()
+	for key in COLOUR_KEYS:
+		if colours.has(key):
+			t.set_color(key, THEME_TYPE, colours[key])
+	for key in constants:
+		t.set_constant(StringName(key), THEME_TYPE, int(constants[key]))
+	if colours.has(&"text"):
+		t.set_color(&"font_color", &"Label", colours[&"text"])
+	if colours.has(&"ink"):
+		t.set_color(&"font_outline_color", &"Label", colours[&"ink"])
+		t.set_constant(&"outline_size", &"Label", 5)
+	return t
+
+
 ## The theme's `font` on [constant THEME_TYPE], or the engine's fallback font emboldened
 ## (and slanted when [param italic]). Bold, because a regular weight over a moving map
 ## reads as a debug overlay.
@@ -225,7 +276,7 @@ func ink_plate(rect: Rect2, fill: Color = Color(0, 0, 0, -1), radius: int = 7, e
 	draw_style_box(box, rect)
 
 
-## A key drawn as a key: a light cap with the key's name, its left edge at [param at].x and
+## A key drawn as a key: a cap in the theme's `keycap` with the key's name, its left edge at [param at].x and
 ## its centre at [param at].y. Returns its width.
 func ink_keycap(at: Vector2, key: String, font_size: int = 13, alpha: float = 1.0) -> float:
 	var w := keycap_width(key, font_size)
@@ -233,7 +284,8 @@ func ink_keycap(at: Vector2, key: String, font_size: int = 13, alpha: float = 1.
 	var rect := Rect2(at.x, at.y - h * 0.5, w, h)
 	ink_plate(Rect2(rect.position + Vector2(0.0, 2.0), rect.size), Color(0.0, 0.0, 0.0, 0.45 * alpha), 5, Color(0, 0, 0, 0), 0)
 	var cap := colour(&"keycap")
-	ink_plate(rect, Color(cap, cap.a * alpha), 5, Color(0, 0, 0, 0), 0)
+	var edge := colour(&"keycap_edge")
+	ink_plate(rect, Color(cap, cap.a * alpha), 5, Color(edge, edge.a * alpha), 1 if edge.a > 0.0 else 0)
 	draw_string(font(), Vector2(rect.position.x, rect.end.y - 6.0), key, HORIZONTAL_ALIGNMENT_CENTER, w, font_size, Color(colour(&"keycap_text"), alpha))
 	return w
 

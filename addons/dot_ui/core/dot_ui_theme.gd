@@ -237,19 +237,25 @@ func _style_containers(theme: Theme, unit: float) -> void:
 ## The glance pieces' colours ([DotHudPiece]) from the palette. The plate is the
 ## background made see-through, because a HUD plate that hid the floor would be a panel;
 ## `ink` (the outline under every number) is the background too, so a light palette draws
-## dark numbers ringed in light rather than in black.
+## dark numbers ringed in light rather than in black. A dark palette gets dark key caps
+## edged in its text and score plates tinted, not painted, with a side's colour; a light
+## one keeps light caps and painted plates. Not [method DotHudPiece.theme_from], which also
+## outlines every Label: right over a game, wrong in a menu built from this theme.
 func _style_hud_pieces(theme: Theme) -> void:
 	var t := DotHudPiece.THEME_TYPE
-	theme.set_color(&"plate", t, Color(background, 0.62))
+	var dark := background.get_luminance() < 0.5
+	theme.set_color(&"plate", t, Color(background.darkened(0.3) if dark else background, 0.74 if dark else 0.62))
 	theme.set_color(&"plate_edge", t, Color(outline, 0.35))
 	theme.set_color(&"text", t, text)
 	theme.set_color(&"dim", t, text_dim)
 	theme.set_color(&"low", t, danger)
 	theme.set_color(&"good", t, good)
 	theme.set_color(&"highlight", t, highlight)
-	theme.set_color(&"ink", t, Color(background.darkened(0.6) if background.get_luminance() < 0.5 else background, 0.85))
-	theme.set_color(&"keycap", t, Color(text, 0.95))
-	theme.set_color(&"keycap_text", t, background.darkened(0.2) if background.get_luminance() < 0.5 else surface)
+	theme.set_color(&"ink", t, Color(background.darkened(0.6) if dark else background, 0.88))
+	theme.set_color(&"keycap", t, Color(surface.lightened(0.06), 0.96) if dark else Color(text, 0.95))
+	theme.set_color(&"keycap_text", t, text if dark else surface)
+	theme.set_color(&"keycap_edge", t, Color(text, 0.3) if dark else Color(0, 0, 0, 0))
+	theme.set_constant(&"team_fill", t, 38 if dark else 100)
 	if font != null:
 		theme.set_font(&"font", t, font)
 

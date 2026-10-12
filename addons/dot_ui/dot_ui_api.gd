@@ -18,5 +18,8 @@ extends RefCounted
 #    fit, fit_to_frame; DotUiTheme.highlight and the DotHudPiece theme colours.
 # 5: DotCrosshair fades out while aiming down sights: aim_source, set_aim(), aim_hide_by,
 #    aim_fade_sec, aim_opacity, follow_aim(), opacity_for_aim().
-const LEVEL := 5
+# 6: the dark HUD and themes a game can switch live: DotHudPiece.theme_from(), number(),
+#    COLOUR_KEYS, DEFAULT_CONSTANTS, the keycap_edge colour and the team_fill constant (the
+#    defaults are now the dark HUD); DotHud.user_scale and fit_control().
+const LEVEL := 6
 const OLDEST := 1

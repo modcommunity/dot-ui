@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 371
+const CHECKS := 386
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -246,6 +246,44 @@ func _test_hud_piece() -> void:
 	_check(vitals.colour(&"low") == palette.danger, "with a theme, in the theme's colours")
 	_check(vitals.colour(&"plate").a < 1.0, "and the plate is see-through, not a panel")
 	vitals.theme = null
+
+	# The default is the dark HUD (first play test, 2026-10-11): a dark plate, light words.
+	_check(DotHudPiece.DEFAULTS[&"plate"].get_luminance() < 0.1 and DotHudPiece.DEFAULTS[&"plate"].a >= 0.7,
+		"the default plate is deep and dark, and opaque enough to read on a white wall")
+	_check(DotHudPiece.DEFAULTS[&"keycap"].get_luminance() < 0.3 and DotHudPiece.DEFAULTS[&"keycap_text"].get_luminance() > 0.8,
+		"and a default key cap is a dark cap with a light letter, not a white tile")
+	_check(vitals.number(&"team_fill") == DotHudPiece.DEFAULT_CONSTANTS[&"team_fill"],
+		"a constant with no theme is the default")
+	for key in DotHudPiece.COLOUR_KEYS:
+		if not DotHudPiece.DEFAULTS.has(key):
+			_check(false, "every colour key has a default: %s" % key)
+	# A layer theme from colours: every piece and every plain Label under the node follows it.
+	var layer := Control.new()
+	layer.size = Vector2(800.0, 700.0)
+	add_child(layer)
+	var lit := DotHudPiece.theme_from({&"plate": Color(0.9, 0.9, 0.9, 0.8), &"text": Color(0.1, 0.1, 0.1), &"ink": Color(1, 1, 1, 0.9)}, {&"team_fill": 100})
+	layer.theme = lit
+	var under := DotVitals.new()
+	layer.add_child(under)
+	var words := Label.new()
+	layer.add_child(words)
+	_check(under.colour(&"plate") == Color(0.9, 0.9, 0.9, 0.8) and under.colour(&"text") == Color(0.1, 0.1, 0.1),
+		"a layer theme reaches a piece under it")
+	_check(under.colour(&"low") == DotHudPiece.DEFAULTS[&"low"], "and a colour it leaves out is still the default")
+	_check(under.number(&"team_fill") == 100, "and its constants")
+	_check(words.get_theme_color(&"font_color") == Color(0.1, 0.1, 0.1) and words.get_theme_constant(&"outline_size") > 0
+		and words.get_theme_color(&"font_outline_color") == Color(1, 1, 1, 0.9),
+		"and a plain Label under it takes the text colour, outlined in the ink")
+	layer.theme = DotHudPiece.theme_from({&"plate": Color(0.02, 0.02, 0.04, 0.75)})
+	_check(under.colour(&"plate") == Color(0.02, 0.02, 0.04, 0.75), "a new layer theme is followed at once, nothing rebuilt")
+	layer.queue_free()
+	var built := DotUiTheme.dark().build()
+	vitals.theme = built
+	_check(vitals.colour(&"keycap").get_luminance() < 0.4 and vitals.number(&"team_fill") < 100,
+		"DotUiTheme's dark palette gives dark caps and tinted score plates")
+	vitals.theme = DotUiTheme.light().build()
+	_check(vitals.number(&"team_fill") == 100, "and its light one painted plates, the bright look")
+	vitals.theme = null
 	# The engine's own theme has a default font, which made `has_theme_font` true for every
 	# name, so the pieces drew regular weight: the bold fallback is what no theme gives.
 	_check(vitals.font() == DotHudPiece.bold_font() and vitals._theme_font() == null,
@@ -323,7 +361,21 @@ func _test_hud_fit() -> void:
 	_close(on_screen.size.x, ammo.footprint().size.x * hud.fit(), "a piece inside it is drawn at the HUD's scale", 0.5)
 	hud.fit_to_frame(Vector2(1600.0, 900.0))
 	_close(hud.fit(), 1.0, "and back at full size on a big frame")
+	hud.user_scale = 0.8
+	hud.fit_to_frame(Vector2(1600.0, 900.0))
+	_close(hud.fit(), 0.8, "the player's HUD size multiplies the fit")
+	_close(hud.position.x + (hud.size.x + 16.0) * hud.fit(), 1600.0, "and the HUD still reaches the frame's far edge", 0.5)
+	hud.fit_to_frame(Vector2(854.0, 480.0))
+	_close(hud.fit(), 0.8 * 480.0 / 720.0, "on a small frame too")
 	hud.queue_free()
+
+	# A plain Control as a HUD root (most games: a full-rect Control under a CanvasLayer).
+	var root := Control.new()
+	add_child(root)
+	DotHud.fit_control(root, Vector2(1280.0, 720.0), 1.25)
+	_close(root.scale.x, 1.25, "a plain HUD root is scaled")
+	_close(root.size.x * root.scale.x, 1280.0, "and sized so its anchors still reach the frame's edges", 0.5)
+	root.queue_free()
 	_done()
 
 

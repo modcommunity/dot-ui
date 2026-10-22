@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 386
+const CHECKS := 387
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1224,16 +1224,17 @@ func _test_settings_panel() -> void:
 		"and never one for a secret"
 	)
 
-	_check(panel.editor_for("friendly_fire") is CheckBox, "a bool is a checkbox")
-	_check(panel.editor_for("port") is SpinBox, "an int is a spin box")
+	_check(panel.editor_for("friendly_fire") is DotFormToggle, "a bool is a toggle")
+	_check(panel.editor_for("port") is LineEdit, "an int without a range is a number entry")
 	_check(panel.editor_for("hostname") is LineEdit, "a string is a line edit")
 	_check(
 		panel.editor_for("difficulty") is OptionButton,
 		"and an enum is an option button"
 	)
 
-	var spin := panel.editor_for("tick_rate") as SpinBox
-	_close(spin.min_value, 1.0, "a range hint becomes the spin box's minimum")
+	var spin := panel.editor_for("tick_rate") as DotFormSlider
+	_check(spin != null, "a range hint becomes a slider")
+	_close(spin.min_value, 1.0, "with the range's minimum")
 	_close(spin.max_value, 240.0, "and its maximum")
 	_close(spin.value, 64.0, "starting at the config's value")
 
@@ -1268,7 +1269,7 @@ func _test_settings_apply() -> void:
 	add_child(panel)
 	panel.bind(config)
 
-	(panel.editor_for("port") as SpinBox).value = 27016.0
+	panel.form.set_value("port", 27016)
 	_check(panel.has_pending(), "an edit is held rather than written through")
 	_check(config.port == 27015, "and the config is untouched")
 
@@ -1287,9 +1288,8 @@ func _test_settings_apply() -> void:
 		func(error: DotError) -> void: failures.append(error.message)
 	)
 
-	(panel.editor_for("port") as SpinBox).value = 80.0
-	(panel.editor_for("hostname") as LineEdit).text = "New name"
-	panel.editor_for("hostname").focus_exited.emit()
+	panel.form.set_value("port", 80)
+	panel.form.set_value("hostname", "New name")
 
 	var refused := panel.apply()
 	_check(not refused.ok, "an invalid set is refused")
@@ -1304,7 +1304,7 @@ func _test_settings_apply() -> void:
 	panel.revert()
 	_check(not panel.has_pending(), "reverting throws the edits away")
 	_check(
-		(panel.editor_for("port") as SpinBox).value == 27016.0,
+		int(panel.form.values()["port"]) == 27016,
 		"and puts the controls back"
 	)
 
@@ -1313,7 +1313,7 @@ func _test_settings_apply() -> void:
 	live_panel.live = true
 	add_child(live_panel)
 	live_panel.bind(config)
-	(live_panel.editor_for("friendly_fire") as CheckBox).button_pressed = true
+	live_panel.form.set_value("friendly_fire", true)
 	_check(config.friendly_fire, "a live panel writes through immediately")
 
 	panel.queue_free()

@@ -47,11 +47,16 @@ signal apply_failed(error: DotError)
 
 var _config: DotConfig = null
 
-## key -> the Control editing it.
-var _editors: Dictionary = {}
+## The form that draws the rows; the panel is its adapter to a [DotConfig].
+var form: DotUiForm = null
+
+## key -> int enum option names, for enums stored as an index.
+var _index_enums: Dictionary = {}
 
 ## Pending edits when [member live] is off.
 var _pending: Dictionary = {}
+
+var _syncing := false
 
 
 ## Builds the panel from [param config].
@@ -63,16 +68,16 @@ func bind(config: DotConfig) -> DotResult:
 
 	_config = config
 	_pending.clear()
-	_editors.clear()
+	_index_enums.clear()
 
-	for child in get_children():
-		remove_child(child)
-		child.queue_free()
+	if form != null:
+		remove_child(form)
+		form.queue_free()
 
 	var sensitive := config.sensitive_keys()
 	var current_group := ""
-	var heading_shown := ""
-	var built := 0
+	var schema: Array = []
+	var values := {}
 
 	for property in config.get_property_list():
 		if int(property["usage"]) & PROPERTY_USAGE_GROUP != 0:
@@ -93,134 +98,95 @@ func bind(config: DotConfig) -> DotResult:
 		if sensitive.has(key) and not show_sensitive:
 			continue
 
+		var field := _field_for(property, current_group)
 
-		var editor := _build_editor(property, config.get(key))
-
-		if editor == null:
-			# A type with no editor is skipped rather than shown as a dead row: an
-			# uneditable control in a settings panel reads as a broken one.
-			DotLog.debug(
-				CHANNEL,
-				"no editor for property type",
-				{"key": key, "type": int(property["type"])}
-			)
+		if field.is_empty():
+			DotLog.debug(CHANNEL, "no editor for property type", {"key": key, "type": int(property["type"])})
 			continue
 
-		# The heading is added only once a group turns out to have something visible
-		# in it. Adding it before the walk leaves a bare "Storage" heading over
-		# nothing whenever a group holds only secrets.
-		if heading_shown != current_group:
-			heading_shown = current_group
-			_add_heading(current_group)
+		schema.append(field)
+		values[key] = _form_value(key, config.get(key))
 
-		_editors[key] = editor
-		_add_row(key, _label_for(key), editor)
-		built += 1
+	form = DotUiForm.new()
+	form.name = "Form"
+	form.chrome = false
+	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(form)
+	var built := form.build(schema, values)
 
-	if built == 0:
-		DotLog.warn(
-			CHANNEL, "the config produced no editable settings", {"groups": only_groups}
-		)
+	if not built.ok:
+		DotLog.warn(CHANNEL, "the form refused the settings", {"why": built.error.message})
 
-	return DotResult.success(built)
+	form.value_changed.connect(_on_form_value)
 
+	if schema.is_empty():
+		DotLog.warn(CHANNEL, "the config produced no editable settings", {"groups": only_groups})
 
-func _add_heading(group: String) -> void:
-	if group == "":
-		return
-
-	var heading := Label.new()
-	heading.text = group
-	heading.theme_type_variation = &"DotHeading"
-	add_child(heading)
+	return DotResult.success(schema.size())
 
 
-func _add_row(key: String, label_text: String, editor: Control) -> void:
-	var row := HBoxContainer.new()
-	row.name = "Row_%s" % key
-
-	var label := Label.new()
-	label.text = label_text
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.tooltip_text = key
-	row.add_child(label)
-
-	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(editor)
-
-	add_child(row)
-
-
-## Turns a key into something readable. `max_rewind_ms` becomes `Max rewind ms`.
-static func _label_for(key: String) -> String:
-	return key.replace("_", " ").capitalize()
-
-
-func _build_editor(property: Dictionary, value: Variant) -> Control:
+## One form field per config property; empty for a type the form has no editor for.
+func _field_for(property: Dictionary, group: String) -> Dictionary:
 	var key := str(property["name"])
-	var type := int(property["type"])
 	var hint := int(property["hint"])
 	var hint_string := str(property["hint_string"])
+	var field := {"name": key, "label": _label_for(key), "group": group, "tooltip": key}
 
-	match type:
+	match int(property["type"]):
 		TYPE_BOOL:
-			var check := CheckBox.new()
-			check.button_pressed = bool(value)
-			check.toggled.connect(func(on: bool) -> void: _edited(key, on))
-			return check
-
+			field["type"] = "bool"
 		TYPE_INT, TYPE_FLOAT:
+			var is_int := int(property["type"]) == TYPE_INT
 			if hint == PROPERTY_HINT_ENUM:
-				var options := OptionButton.new()
-				var choices := hint_string.split(",", false)
-				for index in range(choices.size()):
-					options.add_item(choices[index].get_slice(":", 0), index)
-				options.selected = clampi(int(value), 0, maxi(0, choices.size() - 1))
-				options.item_selected.connect(
-					func(index: int) -> void: _edited(key, index)
-				)
-				return options
-
-			var spin := SpinBox.new()
-			var bounds := _range_from(hint, hint_string, type)
-			spin.min_value = bounds.x
-			spin.max_value = bounds.y
-			spin.step = bounds.z
-			spin.allow_greater = hint != PROPERTY_HINT_RANGE
-			spin.allow_lesser = hint != PROPERTY_HINT_RANGE
-			spin.value = float(value)
-			spin.value_changed.connect(func(v: float) -> void:
-				_edited(key, int(v) if type == TYPE_INT else v)
-			)
-			return spin
-
+				var names: Array = []
+				for choice in hint_string.split(",", false):
+					names.append(choice.get_slice(":", 0))
+				_index_enums[key] = names
+				field["type"] = "string"
+				field["enum"] = names
+			else:
+				field["type"] = "int" if is_int else "float"
+				if hint == PROPERTY_HINT_RANGE and hint_string != "":
+					var bounds := _range_from(hint, hint_string, int(property["type"]))
+					field["min"] = bounds.x if not is_int else int(bounds.x)
+					field["max"] = bounds.y if not is_int else int(bounds.y)
+					field["step"] = bounds.z
 		TYPE_STRING, TYPE_STRING_NAME:
+			field["type"] = "string"
 			if hint == PROPERTY_HINT_ENUM:
-				var options := OptionButton.new()
-				var choices := hint_string.split(",", false)
-				var selected := 0
-				for index in range(choices.size()):
-					var choice := choices[index].get_slice(":", 0)
-					options.add_item(choice, index)
-					if choice == str(value):
-						selected = index
-				options.selected = selected
-				options.item_selected.connect(func(index: int) -> void:
-					_edited(key, options.get_item_text(index))
-				)
-				return options
-
-			var edit := LineEdit.new()
-			edit.text = str(value)
-			# text_submitted and focus_exited rather than text_changed: a config write
-			# per keystroke is a write per keystroke, and with `live` on that is a
-			# validate() per character typed.
-			edit.text_submitted.connect(func(text: String) -> void: _edited(key, text))
-			edit.focus_exited.connect(func() -> void: _edited(key, edit.text))
-			return edit
-
+				var names: Array = []
+				for choice in hint_string.split(",", false):
+					names.append(choice.get_slice(":", 0))
+				field["enum"] = names
 		_:
-			return null
+			return {}
+
+	return field
+
+
+func _form_value(key: String, value: Variant) -> Variant:
+	if _index_enums.has(key):
+		var names: Array = _index_enums[key]
+		return names[clampi(int(value), 0, maxi(0, names.size() - 1))] if not names.is_empty() else ""
+
+	if value is StringName:
+		return str(value)
+
+	return value
+
+
+func _config_value(key: String, value: Variant) -> Variant:
+	if _index_enums.has(key):
+		return maxi(0, (_index_enums[key] as Array).find(str(value)))
+
+	return value
+
+
+func _on_form_value(key: String, value: Variant) -> void:
+	if _syncing:
+		return
+
+	_edited(key, _config_value(key, value))
 
 
 ## Range and step from an `@export_range` hint string, with sane fallbacks.
@@ -241,6 +207,11 @@ static func _range_from(hint: int, hint_string: String, type: int) -> Vector3:
 		step = parts[2].to_float()
 
 	return Vector3(parts[0].to_float(), parts[1].to_float(), step)
+
+
+## Turns a key into something readable. `max_rewind_ms` becomes `Max rewind ms`.
+static func _label_for(key: String) -> String:
+	return key.replace("_", " ").capitalize()
 
 
 func _edited(key: String, value: Variant) -> void:
@@ -285,7 +256,7 @@ func apply() -> DotResult:
 		return valid
 
 	var count := _pending.size()
-	_pending.clear()
+	refresh()
 	applied.emit()
 	return DotResult.success(count)
 
@@ -299,43 +270,31 @@ func revert() -> void:
 
 
 ## Re-reads every value from the config into its control.
-##
-## Setting a control's value fires its own signal, which would be read back as an edit
-## and re-queued — so the pending map is cleared afterwards rather than before.
 func refresh() -> void:
-	if _config == null:
+	if _config == null or form == null:
 		return
 
-	for key in _editors.keys():
-		_set_editor_value(_editors[key], _config.get(key))
+	var values := {}
 
+	for key in form.values().keys():
+		values[key] = _form_value(key, _config.get(key))
+
+	_syncing = true
+	form.set_values(values)
+	_syncing = false
 	_pending.clear()
-
-
-static func _set_editor_value(editor: Control, value: Variant) -> void:
-	if editor is CheckBox:
-		(editor as CheckBox).button_pressed = bool(value)
-	elif editor is SpinBox:
-		(editor as SpinBox).value = float(value)
-	elif editor is LineEdit:
-		(editor as LineEdit).text = str(value)
-	elif editor is OptionButton:
-		var options := editor as OptionButton
-		if typeof(value) == TYPE_INT:
-			options.selected = int(value)
-		else:
-			for index in range(options.item_count):
-				if options.get_item_text(index) == str(value):
-					options.selected = index
-					break
 
 
 func bound_config() -> DotConfig:
 	return _config
 
 
+## The control editing [param key], or null.
 func editor_for(key: String) -> Control:
-	return _editors.get(key)
+	if form == null or form.row(key) == null:
+		return null
+
+	return form.row(key).editor()
 
 
 func pending_count() -> int:
@@ -349,7 +308,7 @@ func has_pending() -> bool:
 func describe() -> Dictionary:
 	return {
 		"config": _config.get_class() if _config != null else "<none>",
-		"editors": _editors.size(),
+		"editors": form.values().size() if form != null else 0,
 		"pending": _pending.size(),
 		"live": live,
 	}

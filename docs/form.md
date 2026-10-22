@@ -1,6 +1,6 @@
 # The form kit
 
-`DotUiForm` builds a settings form from a profile schema (`DotProfileSet.field` dictionaries: name, type, default, `min`, `max`, `enum`, plus the form's own `group`, `unit`, `description`, `label`, `step`, `slider`, `secret`, `items`, `validator`) and the current values. It is the owner of the look for admin and settings forms; the older panels are ported to it over time.
+`DotUiForm` builds a settings form from a profile schema (`DotProfileSet.field` dictionaries: name, type, default, `min`, `max`, `enum`, plus the form's own `group`, `unit`, `description`, `label`, `step`, `slider`, `secret`, `items`, `validator`) and the current values. It is the owner of the look for admin and settings forms; `DotSettingsPanel` is ported (below); dot-menu's Escape-menu rows are not.
 
 ```gdscript
 var form := DotUiForm.new()
@@ -30,4 +30,6 @@ form.applied.connect(func(changes): save(changes))
 
 `examples/form_demo.tscn` is a weapon profile (T switches light and dark); `tools/form_screenshot.sh` renders `docs/form_dark.png`, `form_light.png`, `form_search.png`, `form_collapsed.png` and the phone-sized `form_phone_dark.png`, `form_phone_light.png`. The suite is `examples/form_selftest.tscn`.
 
-Not done: porting `DotSettingsPanel` and dot-menu's screens onto the form, per-row undo, drag reordering of list items, a gamepad on-screen keyboard for text.
+`chrome = false` leaves out the title, search and Apply bar and lets the cards take their full height, for a host that scrolls and applies itself. `DotSettingsPanel` is exactly that: it builds a schema from a `DotConfig`'s property list (range hints become sliders, int enums become dropdowns stored by index, secrets are left out), keeps `bind`, `apply` (validate and roll back), `revert`, `refresh`, `live`, `only_groups` and its three signals, and exposes the form as `panel.form`. `editor_for(key)` now answers the form's own widget (`DotFormToggle`, `DotFormSlider`, `LineEdit`, `OptionButton`), not a `CheckBox` or `SpinBox`.
+
+Not ported on purpose: dot-menu's Escape menu. Its rows are views of settings written on change with the game's palette themes, server clamp notes, live and custom rows and key buttons, and its suite and rules address them by name; the form's card look would drop all of that for no gain. Not done: per-row undo, drag reordering of list items, a gamepad on-screen keyboard for text.

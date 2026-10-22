@@ -22,6 +22,8 @@ signal reverted()
 @export var title := ""
 ## Below this width the rows stack and targets grow to touch size.
 @export var compact_below := 560.0
+## False leaves out the title, search and Apply bar and lets the cards take their full height, for a host (such as [DotSettingsPanel]) that scrolls and applies itself.
+@export var chrome := true
 ## Group names are split on this to nest cards ("Damage/Falloff").
 @export var group_separator := "/"
 
@@ -311,6 +313,11 @@ func _construct() -> void:
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.follow_focus = true
+	if not chrome:
+		_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_scroll.size_flags_vertical = Control.SIZE_FILL
+		head.visible = false
+		_search.visible = false
 	_shell.add_child(_scroll)
 	_content = VBoxContainer.new()
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -366,6 +373,7 @@ func _construct() -> void:
 	_apply_btn.custom_minimum_size.y = tokens.target()
 	_apply_btn.pressed.connect(func() -> void: apply())
 	bar.add_child(_apply_btn)
+	footer.visible = chrome
 	outer.add_child(footer)
 	_apply_compact()
 	if _filter != "":

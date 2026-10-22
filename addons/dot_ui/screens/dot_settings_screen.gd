@@ -55,7 +55,7 @@ var title_text: String = "Settings"
 ## The panel is this size whatever the document's length: the rows scroll inside it and the
 ## buttons sit below the scroll, so a config with eleven settings and one with a hundred
 ## both produce a screen a player can leave.
-var half_size: Vector2 = Vector2(260.0, 240.0)
+var half_size: Vector2 = Vector2(340.0, 300.0)
 
 ## Groups to show, or empty for all. Passed to [member DotSettingsPanel.only_groups].
 var groups: Array[String] = []

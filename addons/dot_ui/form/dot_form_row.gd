@@ -6,6 +6,8 @@ extends MarginContainer
 ## [param error] is empty when [param value] is valid; otherwise [param value] is the last good one.
 signal edited(key: String, value: Variant, error: String)
 signal reset_requested(key: String)
+## A controller pressed accept on a text box; the form decides whether to open its on-screen keyboard.
+signal keypad_requested(edit: LineEdit, numeric: bool)
 
 var field: Dictionary = {}
 var key := ""
@@ -33,6 +35,8 @@ var _option: OptionButton
 var _picker: ColorPickerButton
 var _list: VBoxContainer
 var _syncing := false
+var _line: HBoxContainer
+var _right: VBoxContainer
 
 
 func build(p_field: Dictionary, p_tokens: DotFormTokens) -> void:
@@ -75,6 +79,8 @@ func build(p_field: Dictionary, p_tokens: DotFormTokens) -> void:
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", tokens.sp(2))
 	right.add_child(line)
+	_line = line
+	_right = right
 	_build_editor(line)
 	_reset = Button.new()
 	_reset.theme_type_variation = &"FormReset"
@@ -164,6 +170,7 @@ func _make_entry(line: HBoxContainer, placeholder: String) -> void:
 	_entry.text_changed.connect(_on_entry_text)
 	_entry.focus_exited.connect(_on_entry_blur)
 	_entry.text_submitted.connect(func(_t: String) -> void: _on_entry_blur())
+	_hook_keypad(_entry, DotFormSchema.is_numeric(field))
 	if field["type"] == "color":
 		_entry.custom_minimum_size.x = tokens.px(104.0)
 		_entry.max_length = 9
@@ -175,6 +182,14 @@ func set_compact(on: bool) -> void:
 	_box.vertical = on
 	_box.get_child(0).size_flags_stretch_ratio = 1.0 if on else 0.8
 	_box.get_child(1).size_flags_stretch_ratio = 1.0 if on else 1.2
+	if _list != null and _reset != null:
+		var home: Node = _right if on else _line
+		if _reset.get_parent() != home:
+			_reset.get_parent().remove_child(_reset)
+			home.add_child(_reset)
+			if on:
+				_right.move_child(_reset, 1)
+		_reset.size_flags_horizontal = Control.SIZE_SHRINK_END if on else Control.SIZE_FILL
 
 
 ## Shows [param v] without emitting; the row remembers it as the current value.
@@ -259,7 +274,7 @@ func editor() -> Control:
 		if c != null:
 			return c
 	if _list != null and _list.get_child_count() > 0:
-		return _list.get_child(0).get_child(0) as Control
+		return _item_edit(_item_rows()[0]) if not _item_rows().is_empty() else null
 	return null
 
 
@@ -314,10 +329,31 @@ func _as_color(v: Variant) -> Color:
 	return v if v is Color else Color.from_string(str(v), Color.WHITE)
 
 
+func _hook_keypad(e: LineEdit, numeric: bool) -> void:
+	e.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventJoypadButton and ev.pressed and (ev.button_index == JOY_BUTTON_A or ev.is_action(&"ui_accept")) and e.editable:
+			e.accept_event()
+			keypad_requested.emit(e, numeric))
+
+
+func _item_rows() -> Array[HBoxContainer]:
+	var out: Array[HBoxContainer] = []
+	for c in _list.get_children():
+		if c is HBoxContainer:
+			out.append(c)
+	return out
+
+
+func _item_edit(row: HBoxContainer) -> LineEdit:
+	return row.get_meta("edit") as LineEdit
+
+
 func _rebuild_list(items: Array) -> void:
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
+	var reorder: bool = field.get("reorder", true)
+	var numeric_items: bool = field.get("items", "string") == "int" or field.get("items", "string") == "float"
 	for i in items.size():
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", tokens.sp(1))
@@ -326,7 +362,26 @@ func _rebuild_list(items: Array) -> void:
 		e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		e.text = DotFormSchema.display({"type": field.get("items", "string")}, items[i])
 		e.text_changed.connect(func(_t: String) -> void: _list_changed())
+		e.gui_input.connect(func(ev: InputEvent) -> void:
+			if reorder and ev is InputEventKey and ev.pressed and ev.alt_pressed and (ev.keycode == KEY_UP or ev.keycode == KEY_DOWN):
+				e.accept_event()
+				move_item(row.get_index(), row.get_index() + (-1 if ev.keycode == KEY_UP else 1), "edit"))
+		_hook_keypad(e, numeric_items)
+		row.set_meta("edit", e)
+		if reorder:
+			var grip := Control.new()
+			grip.custom_minimum_size = Vector2(tokens.px(18.0), tokens.target())
+			grip.mouse_default_cursor_shape = Control.CURSOR_DRAG
+			grip.tooltip_text = "Drag to reorder"
+			grip.draw.connect(_draw_grip.bind(grip))
+			grip.set_drag_forwarding(_drag_item.bind(row), Callable(), Callable())
+			row.add_child(grip)
+			for c in [row, e]:
+				(c as Control).set_drag_forwarding(Callable(), _can_drop_item.bind(row), _drop_item.bind(row))
 		row.add_child(e)
+		if reorder:
+			row.add_child(_step_button("▲", "Move up", row, -1))
+			row.add_child(_step_button("▼", "Move down", row, 1))
 		var rm := Button.new()
 		rm.theme_type_variation = &"FormGhost"
 		rm.text = "×"
@@ -335,6 +390,7 @@ func _rebuild_list(items: Array) -> void:
 		rm.pressed.connect(func() -> void:
 			row.get_parent().remove_child(row)
 			row.queue_free()
+			_sync_list_buttons()
 			_list_changed())
 		row.add_child(rm)
 		_list.add_child(row)
@@ -344,6 +400,77 @@ func _rebuild_list(items: Array) -> void:
 	add.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add.pressed.connect(_add_item)
 	_list.add_child(add)
+	_sync_list_buttons()
+
+
+func _step_button(glyph: String, tip: String, row: HBoxContainer, dir: int) -> Button:
+	var b := Button.new()
+	b.theme_type_variation = &"FormGhost"
+	b.text = glyph
+	b.tooltip_text = tip
+	b.custom_minimum_size = Vector2(tokens.target(), tokens.target())
+	b.set_meta("dir", dir)
+	b.pressed.connect(func() -> void: move_item(row.get_index(), row.get_index() + dir, "up" if dir < 0 else "down"))
+	return b
+
+
+func _draw_grip(grip: Control) -> void:
+	var r := maxf(1.5, tokens.px(1.6))
+	var gap := float(tokens.px(6.0))
+	var mid := grip.size * 0.5
+	for dx in [-0.5, 0.5]:
+		for dy in [-1.0, 0.0, 1.0]:
+			grip.draw_circle(mid + Vector2(dx * gap * 0.8, dy * gap), r, tokens.text_faint)
+
+
+## Up and down are disabled at the ends of the list.
+func _sync_list_buttons() -> void:
+	var rows := _item_rows()
+	for i in rows.size():
+		for c in rows[i].get_children():
+			if c is Button and c.has_meta("dir"):
+				c.disabled = (i == 0 and int(c.get_meta("dir")) < 0) or (i == rows.size() - 1 and int(c.get_meta("dir")) > 0)
+
+
+## Moves list item [param from] to position [param to] (clamped), as an edit. [param focus] is "up", "down" or "edit": what keeps the controller's focus afterwards.
+func move_item(from: int, to: int, focus: String = "") -> bool:
+	if _list == null:
+		return false
+	var rows := _item_rows()
+	to = clampi(to, 0, rows.size() - 1)
+	if from < 0 or from >= rows.size() or from == to:
+		return false
+	var row := rows[from]
+	_list.move_child(row, to)
+	_sync_list_buttons()
+	_list_changed()
+	if focus != "":
+		var want: Control = _item_edit(row)
+		if focus != "edit":
+			for c in row.get_children():
+				if c is Button and c.has_meta("dir") and not c.disabled:
+					if (int(c.get_meta("dir")) < 0) == (focus == "up") or want is LineEdit:
+						want = c
+		if want.is_inside_tree():
+			want.grab_focus()
+	return true
+
+
+func _drag_item(_at: Vector2, row: HBoxContainer) -> Variant:
+	if row.get_viewport().gui_is_dragging():
+		var preview := Label.new()
+		preview.text = "  " + _item_edit(row).text
+		preview.add_theme_stylebox_override("normal", tokens.box(tokens.card_inner, tokens.radius - 2, tokens.accent, 1, 2))
+		(row.get_child(0) as Control).set_drag_preview(preview)
+	return {"dot_form_list": get_instance_id(), "from": row.get_index()}
+
+
+func _can_drop_item(_at: Vector2, data: Variant, _row: HBoxContainer) -> bool:
+	return data is Dictionary and data.get("dot_form_list", 0) == get_instance_id()
+
+
+func _drop_item(_at: Vector2, data: Variant, row: HBoxContainer) -> void:
+	move_item(int(data["from"]), row.get_index())
 
 
 func _add_item() -> void:
@@ -351,15 +478,15 @@ func _add_item() -> void:
 	items.append("")
 	_value = items
 	_rebuild_list(items)
-	(_list.get_child(items.size() - 1).get_child(0) as Control).grab_focus()
+	var rows := _item_rows()
+	_item_edit(rows[rows.size() - 1]).grab_focus()
 	_list_changed()
 
 
 func _list_texts() -> Array:
 	var out := []
-	for c in _list.get_children():
-		if c is HBoxContainer:
-			out.append((c.get_child(0) as LineEdit).text)
+	for r in _item_rows():
+		out.append(_item_edit(r).text)
 	return out
 
 

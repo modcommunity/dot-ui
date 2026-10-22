@@ -27,6 +27,9 @@ signal reverted()
 ## Group names are split on this to nest cards ("Damage/Falloff").
 @export var group_separator := "/"
 
+## A controller's accept on a text box opens an on-screen keyboard; false leaves the box alone.
+@export var gamepad_entry := true
+
 var tokens: DotFormTokens = DotFormTokens.dark()
 
 var _schema: Array[Dictionary] = []
@@ -212,6 +215,24 @@ func focus_key(key: String) -> bool:
 	return true
 
 
+## Opens the on-screen keyboard for [param edit] (a text box in this form); null when one is already open.
+func open_keypad(edit: LineEdit, numeric: bool = false) -> DotFormKeypad:
+	if keypad() != null:
+		return null
+	var pad := DotFormKeypad.new()
+	pad.name = "Keypad"
+	pad.open(self, edit, tokens, numeric)
+	return pad
+
+
+## The open on-screen keyboard, or null.
+func keypad() -> DotFormKeypad:
+	for c in get_children():
+		if c is DotFormKeypad:
+			return c
+	return null
+
+
 func focus_search() -> void:
 	_search.grab_focus()
 	_search.select_all()
@@ -332,6 +353,9 @@ func _construct() -> void:
 		r.show_value(_current[f["name"]])
 		r.edited.connect(_on_row_edited)
 		r.reset_requested.connect(reset_key)
+		r.keypad_requested.connect(func(edit: LineEdit, numeric: bool) -> void:
+			if gamepad_entry:
+				open_keypad(edit, numeric))
 		_rows[f["name"]] = r
 		parent.add_row(r)
 		(_group_rows[parent] as Array).append(r)

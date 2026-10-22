@@ -2,7 +2,7 @@ extends Control
 
 ## A weapon profile in a DotUiForm. T switches light and dark, Ctrl+F searches.
 ##
-## With "-- --shots=dark,light,search,collapsed" it renders those frames into docs/ and quits.
+## With "-- --shots=dark,light,search,collapsed,reorder,keypad" it renders those frames into docs/ and quits.
 
 const OUT_DIR := "res://docs"
 
@@ -93,6 +93,21 @@ func _stage(n: String) -> void:
 	form.set_value("tags", ["sidearm", "starter", "night"])
 	form.row("name").type_text("")
 	form.row("magazine").type_text("200")
+	if n.contains("keypad"):
+		form.row("name").type_text("Service Pisto")
+		form.row("magazine").type_text("12")
+		form.set_value("tags", ["sidearm", "night", "starter"])
+		var pad := form.open_keypad(form.row("name").editor())
+		if n.contains("light"):
+			pad.set_shifted(true)
+		await _frames(4)
+		return
+	if n.contains("reorder"):
+		form.row("tags").move_item(2, 1, "down")
+		await _frames(2)
+		form.focus_key("tags")
+		(form.row("tags")._item_rows()[1].get_child(2) as Control).grab_focus()
+		return
 	if n.contains("search"):
 		form.set_filter("damage")
 	elif n.contains("collapsed"):

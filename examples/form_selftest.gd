@@ -4,8 +4,8 @@ extends Node
 ##
 ## godot --headless --path . res://examples/form_selftest.tscn
 
-const CHECKS := 111
-const SECTIONS := 9
+const CHECKS := 164
+const SECTIONS := 11
 
 var _passed := 0
 var _failed := 0
@@ -29,6 +29,8 @@ func _run() -> void:
 	await _test_dirty()
 	await _test_navigation()
 	await _test_layout()
+	await _test_reorder()
+	await _test_keypad()
 	await _test_bad_input()
 	print("")
 	print("%d sections of %d, %d checks of %d, %d failed" % [_completed, SECTIONS, _passed + _failed, CHECKS, _failed])
@@ -312,6 +314,172 @@ func _test_layout() -> void:
 	g.set_open(true, false)
 	_check(g.reveal == 1.0 and g._clip.custom_minimum_size.y > 0.0, "an open card has")
 	_check(form.describe().contains("changed"), "describe")
+	_done()
+
+
+func _list_values(key: String) -> Array:
+	return form.values()[key]
+
+
+func _step(row_node: HBoxContainer, dir: int) -> Button:
+	for c in row_node.get_children():
+		if c is Button and c.has_meta("dir") and int(c.get_meta("dir")) == dir:
+			return c
+	return null
+
+
+func _test_reorder() -> void:
+	_section("list reorder")
+	await _fresh({"tags": ["a", "b", "c"]})
+	var row: DotFormRow = form.row("tags")
+	var rows := row._item_rows()
+	_check(rows.size() == 3, "three item rows")
+	var down1 := _step(rows[1], 1)
+	_check(down1 != null and down1.focus_mode == Control.FOCUS_ALL and _step(rows[1], -1) != null, "each item has focusable up and down buttons")
+	_check(_step(rows[0], -1).disabled, "the first item cannot move up")
+	_check(_step(rows[2], 1).disabled, "the last item cannot move down")
+	var seen := []
+	form.value_changed.connect(func(k: String, v: Variant) -> void: seen.append([k, v]))
+	down1.pressed.emit()
+	_check(_list_values("tags") == ["a", "c", "b"], "down button swaps with the next")
+	_check(seen.size() == 1 and seen[0][1] == ["a", "c", "b"], "a move is one value_changed edit")
+	_check(form.changes().has("tags") and form.is_dirty(), "a move makes the form dirty")
+	var focus := get_viewport().gui_get_focus_owner()
+	_check(focus is Button and row._item_rows()[2].is_ancestor_of(focus), "focus follows the moved item")
+	_check(row.move_item(2, 0), "move_item reports a move")
+	_check(_list_values("tags") == ["b", "a", "c"], "move_item to the top")
+	_check(not row.move_item(1, 1) and not row.move_item(9, 0), "no-op and out-of-range moves are refused")
+	_check(_list_values("tags") == ["b", "a", "c"], "and change nothing")
+	row.move_item(0, 99)
+	_check(_list_values("tags") == ["a", "c", "b"], "a target past the end clamps")
+	var alt := _key(KEY_UP)
+	alt.alt_pressed = true
+	row._item_edit(row._item_rows()[2]).gui_input.emit(alt)
+	_check(_list_values("tags") == ["a", "b", "c"], "Alt+Up in a text box moves the item up")
+	_check(get_viewport().gui_get_focus_owner() == row._item_edit(row._item_rows()[1]), "and keeps the caret in that box")
+	var data: Variant = row._drag_item(Vector2.ZERO, row._item_rows()[0])
+	_check(row._can_drop_item(Vector2.ZERO, data, row._item_rows()[2]), "a grip drag is accepted by a row")
+	_check(not row._can_drop_item(Vector2.ZERO, {"other": 1}, row._item_rows()[2]), "a foreign drag is not")
+	row._drop_item(Vector2.ZERO, data, row._item_rows()[2])
+	_check(_list_values("tags") == ["b", "c", "a"], "dropping the first item on the last moves it there")
+	form.revert()
+	_check(_list_values("tags") == ["a", "b", "c"], "revert restores the order")
+	row.move_item(0, 1)
+	_check(form.apply().ok and form.changes().is_empty(), "apply keeps a reorder")
+	var typed := DotUiForm.new()
+	add_child(typed)
+	typed.build([DotProfileSet.field("ids", "list", [1, 2, 3], {"items": "int", "reorder": false})])
+	await get_tree().process_frame
+	var plain: DotFormRow = typed.row("ids")
+	_check(plain._item_rows()[0].get_child_count() == 2, "reorder:false leaves edit and remove only")
+	_check(plain.move_item(0, 1), "move_item still works from code")
+	_check(typed.values()["ids"] == [2, 1, 3], "and a typed list keeps its types")
+	typed.queue_free()
+	_done()
+
+
+func _joy(button: JoyButton) -> InputEventJoypadButton:
+	var e := InputEventJoypadButton.new()
+	e.button_index = button
+	e.pressed = true
+	return e
+
+
+func _has_key(pad: DotFormKeypad, label: String) -> bool:
+	for b in pad.find_children("*", "Button", true, false):
+		if (b as Button).text == label:
+			return true
+	return false
+
+
+func _test_keypad() -> void:
+	_section("gamepad text entry")
+	await _fresh({"name": "Pistol"})
+	var edit: LineEdit = form.row("name").editor()
+	var requested := []
+	form.row("name").keypad_requested.connect(func(e: LineEdit, n: bool) -> void: requested.append([e, n]))
+	edit.gui_input.emit(_key(KEY_ENTER))
+	_check(requested.is_empty() and form.keypad() == null, "the keyboard's Enter does not open the pad")
+	var a := _joy(JOY_BUTTON_A)
+	edit.gui_input.emit(a)
+	_check(requested.size() == 1 and requested[0][0] == edit and requested[0][1] == false, "a controller's accept asks for the pad")
+	var pad := form.keypad()
+	_check(pad != null, "and the form opens it")
+	await get_tree().process_frame
+	_check(pad.size.x > 100.0 and pad.size == form.size, "the pad covers the form")
+	var fo := get_viewport().gui_get_focus_owner()
+	_check(fo is Button and pad.is_ancestor_of(fo), "focus moves to a key")
+	var keys := pad.find_children("*", "Button", true, false)
+	_check(keys.size() >= 38, "letters, digits and the action keys exist (%d)" % keys.size())
+	var all_focus := true
+	for b in keys:
+		all_focus = all_focus and (b as Button).focus_mode == Control.FOCUS_ALL
+	_check(all_focus, "every key is focusable")
+	edit.caret_column = edit.text.length()
+	pad.type("!")
+	_check(edit.text == "Pistol!" and form.values()["name"] == "Pistol!", "a key types into the field and the form sees it")
+	pad.backspace()
+	pad.backspace()
+	_check(edit.text == "Pisto", "backspace deletes before the caret")
+	pad.set_shifted(true)
+	_check(_has_key(pad, "Q") and pad.shifted, "shift shows capitals")
+	pad.type("X")
+	_check(not pad.shifted and edit.text == "PistoX", "shift lasts for one letter")
+	pad.set_symbols(true)
+	_check(_has_key(pad, "@"), "the symbol page has symbols")
+	pad._input(_joy(JOY_BUTTON_X))
+	_check(edit.text == "Pisto", "the X button deletes")
+	pad._input(_joy(JOY_BUTTON_Y))
+	_check(edit.text == "Pisto ", "the Y button types a space")
+	var cancel := InputEventAction.new()
+	cancel.action = &"ui_cancel"
+	cancel.pressed = true
+	var closed := []
+	pad.closed.connect(func(ok: bool) -> void: closed.append(ok))
+	pad._input(cancel)
+	_check(closed == [false] and edit.text == "Pistol", "cancel closes and restores the text")
+	_check(form.values()["name"] == "Pistol" and not form.is_dirty(), "and the form is back where it was")
+	await get_tree().process_frame
+	_check(form.keypad() == null, "the pad is gone")
+	_check(get_viewport().gui_get_focus_owner() == edit, "focus returns to the text box")
+	var pad2 := form.open_keypad(edit)
+	_check(pad2 != null and form.open_keypad(edit) == null, "only one pad at a time")
+	pad2.type("2")
+	pad2._input(_joy(JOY_BUTTON_START))
+	await get_tree().process_frame
+	_check(form.values()["name"] == "Pistol2" and form.is_dirty(), "Start confirms and keeps the text")
+	var num := form.open_keypad(form.row("magazine")._entry, true)
+	_check(num.symbols and _has_key(num, "@"), "a number field opens on the digits and symbols page")
+	num.type("x")
+	_check(form.errors().has("magazine"), "an invalid entry through the pad shows the inline error")
+	num.close(false)
+	await get_tree().process_frame
+	_check(not form.errors().has("magazine"), "cancel clears it")
+	var off := DotUiForm.new()
+	off.gamepad_entry = false
+	add_child(off)
+	off.build([DotProfileSet.field("n", "string", "")])
+	await get_tree().process_frame
+	off.row("n").editor().gui_input.emit(a)
+	_check(off.keypad() == null, "gamepad_entry=false never opens it")
+	off.queue_free()
+	await _fresh({"tags": ["a"]})
+	var item_edit: LineEdit = form.row("tags").editor()
+	item_edit.gui_input.emit(a)
+	_check(form.keypad() != null and form.keypad().target == item_edit, "list items open the pad too")
+	form.keypad().type("z")
+	_check(form.values()["tags"] == ["az"], "and edits flow to the list value")
+	form.keypad().close(true)
+	var sec := DotUiForm.new()
+	add_child(sec)
+	sec.build([DotProfileSet.field("pw", "string", "", {"secret": true})])
+	await get_tree().process_frame
+	var sp := sec.open_keypad(sec.row("pw").editor())
+	sp.type("hunter2")
+	_check(not sp._preview.text.contains("hunter2") and sp._preview.text.contains("•"), "a secret is masked in the pad's preview")
+	sp.close(true)
+	sec.queue_free()
+	await get_tree().process_frame
 	_done()
 
 

@@ -23,5 +23,7 @@ extends RefCounted
 #    defaults are now the dark HUD); DotHud.user_scale and fit_control().
 # 7: the schema form kit: DotUiForm, DotFormTokens, DotFormSchema, DotFormRow, DotFormGroup,
 #    DotFormSlider, DotFormToggle (addons/dot_ui/form/).
-const LEVEL := 7
+# 8: the form kit's list reorder (DotFormRow.move_item, the schema key `reorder`) and
+#    gamepad text entry (DotFormKeypad, DotUiForm.open_keypad, keypad, gamepad_entry).
+const LEVEL := 8
 const OLDEST := 1

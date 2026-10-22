@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Renders the form kit to docs/form_*.png: desktop dark, light, search and collapsed, and a phone viewport.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+xvfb-run -a godot --path . --resolution 1280x800 res://examples/form_demo.tscn -- --shots=dark,light,search,collapsed
+xvfb-run -a godot --path . --resolution 390x844 res://examples/form_demo.tscn -- --shots=phone_dark,phone_light

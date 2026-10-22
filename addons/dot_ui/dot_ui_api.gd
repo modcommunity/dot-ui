@@ -21,5 +21,7 @@ extends RefCounted
 # 6: the dark HUD and themes a game can switch live: DotHudPiece.theme_from(), number(),
 #    COLOUR_KEYS, DEFAULT_CONSTANTS, the keycap_edge colour and the team_fill constant (the
 #    defaults are now the dark HUD); DotHud.user_scale and fit_control().
-const LEVEL := 6
+# 7: the schema form kit: DotUiForm, DotFormTokens, DotFormSchema, DotFormRow, DotFormGroup,
+#    DotFormSlider, DotFormToggle (addons/dot_ui/form/).
+const LEVEL := 7
 const OLDEST := 1

@@ -24,6 +24,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
 | `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
 | `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen` |
+| `addons/dot_ui/form/` | `DotUiForm` (schema-driven form), `DotFormTokens`, `DotFormSchema`, `DotFormRow`, `DotFormGroup`, `DotFormSlider`, `DotFormToggle`; [docs/form.md](docs/form.md), `examples/form_demo.tscn`, `examples/form_selftest.tscn`, `tools/form_screenshot.sh` |
 | `addons/dot_ui/dot_ui_config.gd` | `DotUiConfig`, the interface's own settings document |
 | `examples/ui_selftest.tscn` | the suite, offline |
 | `tools/screenshot.sh` | renders pause, settings, HUD, chat, ballot, ballot-result and the three glance-piece frames (`hud_pieces*.png`: no theme, light theme, fitted to 854x480) to `screenshots/` through `xvfb-run` |

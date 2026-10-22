@@ -1,0 +1,12 @@
+# frame-hazards
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+addons/dot_ui/hud/dot_ballot_panel.gd::_process::string_build	3
+addons/dot_ui/hud/dot_ballot_panel.gd::_target_of::alloc_array	1
+addons/dot_ui/hud/dot_ballot_panel.gd::_target_of::string_build	1
+addons/dot_ui/hud/dot_hud_piece.gd::cover_rects::alloc_array	1
+addons/dot_ui/hud/dot_hud_piece.gd::cover_rects::group_lookup	1
+addons/dot_ui/screens/dot_scoreboard_screen.gd::refresh::alloc_array	1
+tools/screenshot.gd::_build_ballot::alloc_array	2
+tools/screenshot.gd::_build_ballot::alloc_dict	2
+tools/screenshot.gd::_build_ballot::string_build	2
+tools/screenshot.gd::_process::string_build	4

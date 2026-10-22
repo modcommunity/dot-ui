@@ -504,7 +504,8 @@ func _process(delta: float) -> void:
 			moved = true
 
 		if not _textures.has(voter) and avatar_fn.is_valid():
-			var person: Dictionary = _people.get(voter, {}) if _people.get(voter, {}) is Dictionary else {}
+			var found: Variant = _people.get(voter, {})
+			var person: Dictionary = found if found is Dictionary else {}
 			var url := str(person.get("avatar", ""))
 
 			if url != "":

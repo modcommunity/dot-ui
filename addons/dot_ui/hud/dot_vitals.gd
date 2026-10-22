@@ -103,6 +103,8 @@ func _process(delta: float) -> void:
 func advance(delta: float) -> void:
 	var target := fraction()
 	var target_armour := armour_fraction()
+	var before := _shown
+	var before_armour := _shown_armour
 	if ease_sec <= 0.0:
 		_shown = target
 		_shown_armour = target_armour
@@ -116,7 +118,8 @@ func advance(delta: float) -> void:
 			_shown = target
 		if absf(_shown_armour - target_armour) < 0.001:
 			_shown_armour = target_armour
-	queue_redraw()
+	if _shown != before or _shown_armour != before_armour:
+		queue_redraw()
 
 
 func _plate() -> Rect2:

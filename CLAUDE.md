@@ -23,7 +23,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_ui/core/` | `DotScreen`, `DotScreenStack`, `DotUiTheme`, `DotInputBinding` |
 | `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
 | `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
-| `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen` |
+| `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen`; `DotWinnerReveal`, the end-of-match winner and podium (its own layer, not a stack screen) |
 | `addons/dot_ui/form/` | `DotUiForm` (schema-driven form), `DotFormTokens`, `DotFormSchema`, `DotFormRow`, `DotFormGroup`, `DotFormSlider`, `DotFormToggle`, `DotFormKeypad` (on-screen keyboard); [docs/form.md](docs/form.md), `examples/form_demo.tscn`, `examples/form_selftest.tscn`, `tools/form_screenshot.sh` |
 | `addons/dot_ui/dot_ui_config.gd` | `DotUiConfig`, the interface's own settings document |
 | `examples/ui_selftest.tscn` | the suite, offline |
@@ -45,6 +45,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - Pushing an open screen raises it; popping from the middle is allowed. [screens](docs/screens.md#pushing-what-is-already-open-raises-it)
 - A screen refusing `_can_pop` still consumes the key; use it sparingly. [screens](docs/screens.md#a-screen-that-refuses-to-close-still-consumes-the-key)
 - A screen's id defaults to its NODE NAME; set one, and assert `stack.top_id()` after a push. A property named like a `DotScreen` method (`screen_id`) breaks the *using* file and hangs the scene: it is `id_override`. [screens](docs/screens.md#a-screens-id)
+- `DotWinnerReveal` is timed by `advance`, never tweens, so a check steps it exactly; `reduced_motion` draws its last frame from the first and bursts nothing. [screens](docs/screens.md#the-winner-reveal)
 - `allow_pause` defaults to off: pausing desyncs a networked client. [screens](docs/screens.md#allow_pause-defaults-to-off)
 
 **Panels and screens**
@@ -93,4 +94,4 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | A whole HUD layer's colours, switched live | `DotHudPiece.theme_from` on the layer's root (dot-menu's `follow_hud` does it per theme) |
 | Keeping a game's HUD out from under a ballot | read the visible members of the `dot_hud_cover` group by that string ([hud](docs/hud.md#a-ballot-on-the-hud)) |
 
-Deliberately not here: transitions (`transition_sec` and `reduced_motion` are declared and read by nothing), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)
+Deliberately not here: screen transitions (`transition_sec` and `DotUiConfig.reduced_motion` are read by nothing; `DotWinnerReveal` has its own `reduced_motion`), localisation, gamepad focus rings, a console, a server browser, textured styling, touch layouts. [hud](docs/hud.md#deliberately-not-here)

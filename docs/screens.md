@@ -88,3 +88,10 @@ The vocabulary is deliberately the one `DotBindingsPanel.event_name` already dra
 **Keys are physical.** A binding stored as a keycode is stored in the player's current layout, and the same file on an AZERTY keyboard binds a key that is not where the label says.
 
 **`apply` replaces rather than adds.** `InputMap.action_add_event` on an action that already has one leaves *both* bound: a rebound key that still answers to its old one, invisible until somebody rebinds crouch onto their forward key and both fire. `ensure_action` is the boot path and never overwrites what a player chose.
+
+## The winner reveal
+
+`DotWinnerReveal` is the end-of-match announcement: a title ("WINNER" by default), the winner's name typed out under it with a stripe, their score, then a podium of up to three columns rising (third, second, first) with names and scores over them, and a burst of confetti drawn from the theme's colours. It ships no art and no sound. A game passes rows best first (`name`, `score` text, optional `colour`) to `present`, and goes on at `finished(skipped)`.
+
+It is a `CanvasLayer` of its own (layer 95), not a `DotScreen`: it takes the whole frame for a few seconds between a match and its scoreboard, and nothing should stack on or under it. Every frame is computed from the seconds since `present` (`advance`), never from tweens, so a check steps it to any instant and a skip is exact. `reduced_motion` draws the final frame from the first and bursts nothing; it still holds for `hold_seconds`, because the scoreboard behind it is not going anywhere. The skip button, `skip_actions` and `skip()` end it with `finished(true)`.
+

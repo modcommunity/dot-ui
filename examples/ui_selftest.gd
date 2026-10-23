@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 389
+const CHECKS := 398
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 28
+const SECTIONS := 29
 
 var _passed := 0
 var _failed := 0
@@ -121,6 +121,7 @@ func _run() -> void:
 	_test_hit_marker()
 	_test_damage_numbers()
 	_test_key_prompt_and_hints()
+	_test_winner_reveal()
 	await _test_settings_screen()
 	await _test_scoreboard_screen()
 
@@ -191,6 +192,37 @@ func _test_scoreboard_screen() -> void:
 	stack.queue_free()
 	_done()
 
+
+func _test_winner_reveal() -> void:
+	_section("DotWinnerReveal: name, podium, its time, a skip, and reduced motion")
+	var r := DotWinnerReveal.new()
+	r.auto_process = false
+	add_child(r)
+	var ended: Array = []
+	r.finished.connect(func(skipped: bool) -> void: ended.append(skipped))
+	_check(not r.present([]).ok, "no entries is refused")
+	var entries := [{"name": "Ada", "score": "25 kills"}, {"name": "Bo", "score": "19 kills"}]
+	_check(r.present(entries).ok and r.visible and r.is_active(), "two entries are shown")
+	_check(r.name_label.text == "Ada" and r.title_label.text == "WINNER" and r.subtitle_label.text == "25 kills",
+		"the winner's name under the title, with the score")
+	_check(r.name_label.visible_ratio == 0.0 and (r.places[0]["column"] as Control).size.y == 0.0,
+		"at the start the name is hidden and the podium flat")
+	_check((r.places[1]["name"] as Label).text == "Bo" and not (r.places[2]["column"] as CanvasItem).visible,
+		"second place is Bo, and third, with nobody in it, is not drawn")
+	r.advance(3.0)
+	_check(r.name_label.visible_ratio == 1.0 and (r.places[0]["column"] as Control).size.y > (r.places[1]["column"] as Control).size.y,
+		"three seconds in the name is out and first stands above second")
+	r.advance(r.hold_seconds)
+	_check(ended == [false] and not r.visible, "its time runs out by itself")
+	var _again := r.present(entries)
+	r.skip_button.pressed.emit()
+	_check(ended == [false, true] and not r.is_active(), "the skip button ends it, skipped")
+	r.reduced_motion = true
+	var _still := r.present(entries)
+	_check(r.name_label.visible_ratio == 1.0 and (r.places[0]["column"] as Control).size.y > 0.0 and r.title_label.scale == Vector2.ONE,
+		"reduced motion: the final frame from the first, nothing to wait for")
+	r.free()
+	_done()
 
 func _section(title: String) -> void:
 	_entered += 1

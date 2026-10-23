@@ -25,5 +25,6 @@ extends RefCounted
 #    DotFormSlider, DotFormToggle (addons/dot_ui/form/).
 # 8: the form kit's list reorder (DotFormRow.move_item, the schema key `reorder`) and
 #    gamepad text entry (DotFormKeypad, DotUiForm.open_keypad, keypad, gamepad_entry).
-const LEVEL := 8
+# 9: DotWinnerReveal, the end-of-match winner and podium (addons/dot_ui/screens/).
+const LEVEL := 9
 const OLDEST := 1

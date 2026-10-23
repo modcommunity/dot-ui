@@ -15,7 +15,7 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 387
+const CHECKS := 389
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2472,6 +2472,11 @@ func _test_chat_window() -> void:
 		str(state.get("open_binding", "")) == "Y",
 		"describe() reports the key, which is what a bug report needs"
 	)
+
+	var bold_before := DotHudPiece.bold_font()
+	DotHudPiece.clear_cache()
+	_check(DotHudPiece._fonts.is_empty(), "clear_cache() empties the shared fonts")
+	_check(DotHudPiece.bold_font() != null and DotHudPiece._fonts.size() == 1 and bold_before != null, "and a font refills it")
 
 	window.queue_free()
 	InputMap.erase_action(&"probe_chat_open")

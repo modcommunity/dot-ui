@@ -245,6 +245,11 @@ static func bold_font(italic: bool = false) -> Font:
 	return _fonts[italic]
 
 
+## Drops the shared fonts so a process can exit without leaking them.
+static func clear_cache() -> void:
+	_fonts.clear()
+
+
 func text_width(words: String, font_size: int, italic: bool = false) -> float:
 	return font(italic).get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
 

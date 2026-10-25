@@ -6,6 +6,8 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 
 **Depends on dot-core and nothing else, and names nothing outside it.** Widgets take strings, dictionaries and `Callable`s; a settings source is an untyped `Object`. A script that so much as mentions another addon's class fails to compile without it. [hud](docs/hud.md#ships-no-art-names-nothing-outside-dot-core)
 
+Also requires **dot-profile** (`DotProfileSet`, `DotProfile`, `DotProfileRuntime`, split from dot-core): link `addons/dot_profile` next to `addons/dot_core`.
+
 ## Read before
 
 | Read | Before |

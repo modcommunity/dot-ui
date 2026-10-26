@@ -171,6 +171,13 @@ func build_theme() -> Theme:
 	th.set_constant("h_separation", "OptionButton", sp(2))
 	th.set_color("font_color", "OptionButton", text)
 
+	_theme_buttons(th, ring, pad_h, pad_v)
+	_theme_labels_and_popups(th)
+	return th
+
+
+## The button variations: primary, ghost, reset and section header.
+func _theme_buttons(th: Theme, ring: StyleBox, pad_h: int, pad_v: int) -> void:
 	th.set_type_variation("FormPrimary", "Button")
 	th.set_stylebox("normal", "FormPrimary", _pad(box(accent, radius - 2), pad_h * 2, pad_v))
 	th.set_stylebox("hover", "FormPrimary", _pad(box(accent.lightened(0.15), radius - 2), pad_h * 2, pad_v))
@@ -214,6 +221,9 @@ func build_theme() -> Theme:
 	th.set_font("font", "FormHeader", bold())
 	th.set_font_size("font_size", "FormHeader", px(font_section))
 
+
+## The label variations, popup menus and the scroll bar.
+func _theme_labels_and_popups(th: Theme) -> void:
 	th.set_type_variation("FormCaption", "Label")
 	th.set_font_size("font_size", "FormCaption", px(font_small))
 	th.set_color("font_color", "FormCaption", text_dim)
@@ -244,4 +254,3 @@ func build_theme() -> Theme:
 		g.content_margin_left = px(4.0)
 		g.content_margin_right = px(4.0)
 		th.set_stylebox(state, "VScrollBar", g)
-	return th

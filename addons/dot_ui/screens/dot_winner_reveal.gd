@@ -4,15 +4,14 @@ extends CanvasLayer
 ## The end-of-match announcement: the winner's name revealed under a title, then a podium of the
 ## top three rising, then [signal finished]. Skippable; [member reduced_motion] shows the final
 ## frame at once, with nothing moving. Driven by [method advance], so a test steps it exactly.
-##
-## [codeblock]
-## var reveal := DotWinnerReveal.new()
-## add_child(reveal)
-## reveal.finished.connect(func(_skipped: bool) -> void: show_scoreboard())
-## reveal.present([{"name": "Ada", "score": "25 kills"}, {"name": "Bo", "score": "19 kills"}])
-## [/codeblock]
 
 const CHANNEL := "dot_ui.winner"
+
+## Podium layout per place (first, second, third): column height as a share of the screen, offset from centre in column widths and gaps, and rise start time.
+const PODIUM_HEIGHTS: Array[float] = [0.3, 0.22, 0.16]
+const PODIUM_COLS: Array[float] = [-0.5, -1.5, 0.5]
+const PODIUM_GAPS: Array[float] = [0.0, -1.0, 1.0]
+const PODIUM_STARTS: Array[float] = [1.6, 1.4, 1.2]
 
 ## The reveal is over (its time ran out, or [param skipped]).
 signal finished(skipped: bool)
@@ -183,31 +182,31 @@ func _pose() -> void:
 	# Podium: second left, first centre, third right; third rises first.
 	var col_w := minf(size.x * 0.17, 260 * unit)
 	var gap := col_w * 0.12
-	var heights := [size.y * 0.3, size.y * 0.22, size.y * 0.16]
-	var xs := [size.x * 0.5 - col_w * 0.5, size.x * 0.5 - col_w * 1.5 - gap, size.x * 0.5 + col_w * 0.5 + gap]
-	var starts := [1.6, 1.4, 1.2]
 	for i in places.size():
 		var place: Dictionary = places[i]
-		var rise := _phase(starts[i], 0.6)
-		var h: float = heights[i] * (_ease_back(rise) if rise > 0.0 else 0.0)
+		var start: float = PODIUM_STARTS[i]
+		var height: float = size.y * PODIUM_HEIGHTS[i]
+		var x: float = size.x * 0.5 + col_w * PODIUM_COLS[i] + gap * PODIUM_GAPS[i]
+		var rise := _phase(start, 0.6)
+		var h: float = height * (_ease_back(rise) if rise > 0.0 else 0.0)
 		var col: ColorRect = place["column"]
 		col.color = medal_colours[i] if i < medal_colours.size() else Color.GRAY
 		col.color.a = 0.92
 		col.size = Vector2(col_w, maxf(h, 0.0))
-		col.position = Vector2(xs[i], size.y - h)
+		col.position = Vector2(x, size.y - h)
 		var rank: Label = place["rank"]
 		rank.add_theme_font_size_override("font_size", int(54 * unit))
 		rank.size = Vector2(col_w, 70 * unit)
-		rank.position = Vector2(xs[i], size.y - h + 8 * unit)
+		rank.position = Vector2(x, size.y - h + 8 * unit)
 		rank.modulate.a = rise
-		var label_in := _phase(starts[i] + 0.45, 0.35)
+		var label_in := _phase(start + 0.45, 0.35)
 		for key: String in ["name", "score"]:
 			var l: Label = place[key]
 			l.add_theme_font_size_override("font_size", int((24 if key == "name" else 17) * unit))
 			l.size = Vector2(col_w + gap * 2.0, 32 * unit)
 			l.modulate.a = label_in
-		(place["name"] as Label).position = Vector2(xs[i] - gap, size.y - heights[i] - 62 * unit)
-		(place["score"] as Label).position = Vector2(xs[i] - gap, size.y - heights[i] - 34 * unit)
+		(place["name"] as Label).position = Vector2(x - gap, size.y - height - 62 * unit)
+		(place["score"] as Label).position = Vector2(x - gap, size.y - height - 34 * unit)
 
 	hint_label.add_theme_font_size_override("font_size", int(15 * unit))
 	hint_label.size = Vector2(size.x * 0.4, 32 * unit)

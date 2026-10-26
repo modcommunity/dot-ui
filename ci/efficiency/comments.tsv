@@ -36,11 +36,11 @@ addons/dot_ui/hud/dot_vitals.gd::long_block	1
 addons/dot_ui/panels/dot_bindings_panel.gd::banner	2
 addons/dot_ui/panels/dot_bindings_panel.gd::long_block	11
 addons/dot_ui/panels/dot_settings_panel.gd::banner	1
-addons/dot_ui/panels/dot_settings_panel.gd::long_block	4
+addons/dot_ui/panels/dot_settings_panel.gd::long_block	3
 addons/dot_ui/screens/dot_pause_screen.gd::long_block	4
 addons/dot_ui/screens/dot_scoreboard_screen.gd::long_block	1
 addons/dot_ui/screens/dot_settings_screen.gd::long_block	7
-examples/ui_selftest.gd::banner	13
+examples/ui_selftest.gd::banner	12
 examples/ui_selftest.gd::history	3
-examples/ui_selftest.gd::long_block	15
+examples/ui_selftest.gd::long_block	11
 tools/screenshot.gd::long_block	10

@@ -1,4 +1,4 @@
-extends Node
+extends "selftest/selftest_base.gd"
 
 ## Exercises everything in dot-ui, offline and headless.
 ##
@@ -13,8 +13,6 @@ extends Node
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const BINDINGS_FILE := "user://test_bindings.json"
-
 const CHECKS := 407
 
 ## Sections entered against sections that ran to their last line, and against this. A
@@ -22,68 +20,6 @@ const CHECKS := 407
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
 const SECTIONS := 30
-
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
-var _entered := 0
-var _completed := 0
-
-
-## A config with one of everything, including a secret, so the generated panel can be
-## checked against something with a known shape.
-class TestConfig extends DotConfig:
-	@export_group("Network")
-	@export var port: int = 27015
-	@export_range(1, 240, 1) var tick_rate: int = 64
-	@export var hostname: String = "A server"
-	@export var rcon_password: String = "hunter2"
-
-	@export_group("Gameplay")
-	@export var friendly_fire: bool = false
-	@export_range(0.0, 10.0, 0.5) var gravity: float = 8.0
-	@export_enum("easy", "normal", "hard") var difficulty: String = "normal"
-
-	func env_prefix() -> String:
-		return "TEST_"
-
-	func cli_prefix() -> String:
-		return "--test-"
-
-	func sensitive_keys() -> PackedStringArray:
-		return PackedStringArray(["rcon_password"])
-
-	func validate() -> DotResult:
-		if port < 1024:
-			return DotResult.fail(
-				DotError.CODE_INVALID, "Ports below 1024 need root."
-			)
-		return DotResult.success(null)
-
-
-## A screen that records every lifecycle call, so the ordering can be asserted.
-class TestScreen extends DotScreen:
-	var id: StringName = &"test"
-	var events: Array[String] = []
-	var refuse_pop: bool = false
-
-	func _screen_id() -> StringName:
-		return id
-
-	func _can_pop() -> bool:
-		return not refuse_pop
-
-	func _on_push() -> void:
-		events.append("push")
-
-	func _on_pop() -> void:
-		events.append("pop")
-
-	func _on_cover() -> void:
-		events.append("cover")
-
-	func _on_reveal() -> void:
-		events.append("reveal")
 
 
 func _ready() -> void:
@@ -225,44 +161,8 @@ func _test_winner_reveal() -> void:
 	r.free()
 	_done()
 
-func _section(title: String) -> void:
-	_entered += 1
-	_group(title)
-
-
-## A section reached its last line. See [constant SECTIONS].
-func _done() -> void:
-	_completed += 1
-
-
-func _check(condition: bool, what: String, detail: String = "") -> bool:
-	if condition:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		_failures.append(what if detail == "" else "%s — %s" % [what, detail])
-		print("  FAIL  %s%s" % [what, "" if detail == "" else " — " + detail])
-	return condition
-
-
-func _close(a: float, b: float, what: String, epsilon: float = 0.01) -> bool:
-	return _check(absf(a - b) <= epsilon, what, "%.3f vs %.3f" % [a, b])
-
-
-func _group(title: String) -> void:
-	print("")
-	print("%s" % title)
-
 
 # --- The glance pieces -------------------------------------------------------
-
-## A piece in the tree, laid out at [param rect] in this node's space.
-func _piece(piece: DotHudPiece, rect: Rect2) -> DotHudPiece:
-	piece.position = rect.position
-	piece.size = rect.size
-	add_child(piece)
-	return piece
 
 
 ## Colours from the theme or the defaults, and what a piece does under a cover.
@@ -572,22 +472,6 @@ func _test_key_prompt_and_hints() -> void:
 
 
 # --- Fixtures --------------------------------------------------------------
-
-func _make_stack() -> DotScreenStack:
-	var stack := DotScreenStack.new()
-	stack.register_service = false
-	stack.manage_mouse = false
-	stack.config = DotUiConfig.new()
-	stack.config.allow_pause = false
-	add_child(stack)
-	return stack
-
-
-func _make_screen(id: StringName) -> TestScreen:
-	var screen := TestScreen.new()
-	screen.id = id
-	screen.name = String(id).capitalize()
-	return screen
 
 
 # --- Theme -----------------------------------------------------------------
@@ -1358,36 +1242,6 @@ func _test_settings_apply() -> void:
 
 # --- Bindings --------------------------------------------------------------
 
-## A source that is not a DotConfig: `to_config()` out, `absorb_config()` back.
-##
-## Deliberately NOT a `DotSettingsManager`. dot-ui depends on dot-core and nothing else,
-## and a suite that could only test this against the real thing would be a suite proving
-## the dependency rather than the seam. A plain `RefCounted` with two methods is the whole
-## contract, and that this passes is what says so.
-class FakeSettingsSource:
-	extends RefCounted
-
-	var stored: Dictionary = {"port": 111, "hostname": "before"}
-	var absorbed := 0
-
-	func to_config() -> DotConfig:
-		var cfg := TestConfig.new()
-		cfg.port = int(stored["port"])
-		cfg.hostname = str(stored["hostname"])
-		return cfg
-
-	func absorb_config(cfg: DotConfig) -> PackedStringArray:
-		absorbed += 1
-		var changed := PackedStringArray()
-		var typed := cfg as TestConfig
-		if typed.port != int(stored["port"]):
-			stored["port"] = typed.port
-			changed.append("port")
-		if typed.hostname != str(stored["hostname"]):
-			stored["hostname"] = typed.hostname
-			changed.append("hostname")
-		return changed
-
 
 func _test_settings_screen() -> void:
 	_section("settings screen")
@@ -1925,12 +1779,6 @@ func _test_input_binding() -> void:
 
 # --- The chat window -------------------------------------------------------
 
-func _key(code: Key) -> InputEventKey:
-	var e := InputEventKey.new()
-	e.keycode = code
-	e.pressed = true
-	return e
-
 
 func _ballot_state(input: String, voters: Dictionary = {}) -> Dictionary:
 	return {
@@ -2095,22 +1943,6 @@ func _row_drawn(panel: DotBallotPanel, voter: String) -> int:
 	return -1
 
 
-## The local voter's avatar against the row marked as theirs: ballot-panel-avatar-stale-row-1.
-##
-## A rendered game-vote frame showed the voter's avatar on row 5 while row 6, "Don't change",
-## was the marked choice and the result was up. Two ways to get there, both reproduced here:
-## a ballot decided by the click itself (the server closes it at once, so the result is
-## drawn while the avatar is still sliding down from the heading), and a server state sent
-## before the click arriving after it (the stale vote replaced the click, and with the
-## ballot closing on that click no later state ever corrected it).
-class ClickProbe extends Node:
-	var seen := 0
-
-	func _unhandled_input(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed:
-			seen += 1
-
-
 func _click() -> InputEventMouseButton:
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -2267,19 +2099,6 @@ func _test_ballot_avatar_rows() -> void:
 
 	panel.queue_free()
 	_done()
-
-
-class FakeSelfMute extends RefCounted:
-	var ran: Array[String] = []
-	var muted: Dictionary = {}
-	func claims_chat(text: String) -> bool:
-		var t := text.strip_edges().to_lower()
-		return (t.begins_with("!") or t.begins_with("/")) and (t.substr(1) == "sm" or t.substr(1).begins_with("sm "))
-	func handle_chat(text: String) -> PackedStringArray:
-		ran.append(text)
-		return PackedStringArray(["ran"])
-	func is_muted(name: String, _sender: String = "") -> bool:
-		return muted.has(name)
 
 
 func _test_chat_window() -> void:
@@ -2448,12 +2267,7 @@ func _test_chat_window() -> void:
 	window.enabled = false
 	_check(not window.is_open(), "turning it off while it is open closes it")
 
-	# --- The two things only a picture found -------------------------------
-
-	# [b]A line put in before the engine readied the node.[/b] A host that builds the box
-	# and immediately announces something — or builds it in `SceneTree._initialize`, where
-	# nothing is inside the tree at all — was writing into a log that did not exist yet,
-	# and the line vanished with nothing said.
+	# A line added before the node is readied must be kept: the log is built on demand.
 	var early := DotChatWindow.new()
 	early.register_actions = false
 	early.add_text("connecting to the server")
@@ -2465,10 +2279,7 @@ func _test_chat_window() -> void:
 	add_child(early)
 	_check(early.line_count() == 1, "and survives being added to the tree")
 
-	# [b]Wrapping.[/b] DotFeedView draws an entry as one run of text and does not clip it,
-	# which is right for a kill feed and wrong for chat: the server's own limit is 127
-	# characters and the box is 460 pixels wide, so an ordinary sentence ran out of the box
-	# and across the middle of the screen.
+	# Wrapping: DotFeedView does not clip an entry, so a 127-character line ran out of the 460 px box.
 	early.clear()
 	early.add_said("someone", "short")
 	var short_rows := early.line_count()

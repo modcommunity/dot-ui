@@ -2,13 +2,6 @@ class_name DotUiForm
 extends PanelContainer
 
 ## A form built from a profile schema: grouped cards, a widget per type, search, per-key reset, dirty state with apply and revert.
-##
-## [codeblock]
-## var form := DotUiForm.new()
-## add_child(form)
-## var res := form.build(schema, current_values)   # DotResult
-## form.applied.connect(func(changes): save(changes))
-## [/codeblock]
 
 signal value_changed(key: String, value: Variant)
 signal key_reset(key: String)
@@ -345,6 +338,15 @@ func _construct() -> void:
 	_content.add_theme_constant_override("separation", tokens.sp(3))
 	_scroll.add_child(_content)
 
+	_build_rows()
+	outer.add_child(_build_footer())
+	_apply_compact()
+	if _filter != "":
+		set_filter(_filter)
+
+
+## One DotFormRow per schema field, in its group, plus the empty-state label.
+func _build_rows() -> void:
 	var by_path := {}
 	for f in _schema:
 		var parent := _ensure_group(str(f["group"]), by_path)
@@ -368,6 +370,9 @@ func _construct() -> void:
 	gap.custom_minimum_size.y = tokens.sp(2)
 	_content.add_child(gap)
 
+
+## The status line with Revert and Apply.
+func _build_footer() -> PanelContainer:
 	var footer := PanelContainer.new()
 	var fsb := tokens.box(tokens.card, 0, tokens.border, 0, 2)
 	fsb.border_width_top = 1
@@ -398,10 +403,7 @@ func _construct() -> void:
 	_apply_btn.pressed.connect(func() -> void: apply())
 	bar.add_child(_apply_btn)
 	footer.visible = chrome
-	outer.add_child(footer)
-	_apply_compact()
-	if _filter != "":
-		set_filter(_filter)
+	return footer
 
 
 func _ensure_group(path: String, made: Dictionary) -> DotFormGroup:

@@ -442,6 +442,12 @@ func _test_keypad() -> void:
 	await get_tree().process_frame
 	_check(form.keypad() == null, "the pad is gone")
 	_check(get_viewport().gui_get_focus_owner() == edit, "focus returns to the text box")
+	await _test_keypad_modes(edit, a)
+	_done()
+
+
+## Confirm, number fields, gamepad_entry off, list items and secrets, in the keypad section.
+func _test_keypad_modes(edit: LineEdit, a: InputEvent) -> void:
 	var pad2 := form.open_keypad(edit)
 	_check(pad2 != null and form.open_keypad(edit) == null, "only one pad at a time")
 	pad2.type("2")
@@ -480,7 +486,6 @@ func _test_keypad() -> void:
 	sp.close(true)
 	sec.queue_free()
 	await get_tree().process_frame
-	_done()
 
 
 func _test_bad_input() -> void:

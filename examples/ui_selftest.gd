@@ -15,13 +15,13 @@ extends Node
 
 const BINDINGS_FILE := "user://test_bindings.json"
 
-const CHECKS := 398
+const CHECKS := 407
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 29
+const SECTIONS := 30
 
 var _passed := 0
 var _failed := 0
@@ -113,6 +113,7 @@ func _run() -> void:
 	_test_chat_window()
 	_test_ballot_panel()
 	_test_ballot_avatar_rows()
+	await _test_pointer_recapture()
 	_test_hud_piece()
 	_test_hud_fit()
 	_test_vitals()
@@ -2102,6 +2103,80 @@ func _row_drawn(panel: DotBallotPanel, voter: String) -> int:
 ## drawn while the avatar is still sliding down from the heading), and a server state sent
 ## before the click arriving after it (the stale vote replaced the click, and with the
 ## ballot closing on that click no later state ever corrected it).
+class ClickProbe extends Node:
+	var seen := 0
+
+	func _unhandled_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			seen += 1
+
+
+func _click() -> InputEventMouseButton:
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = Vector2(2, 2)
+	click.global_position = click.position
+	return click
+
+
+## Every modal that frees the mouse must keep it free on a click outside it and when another screen closes.
+func _test_pointer_recapture() -> void:
+	_section("pointer recapture")
+	var saved := Input.mouse_mode
+
+	var probe := ClickProbe.new()
+	add_child(probe)
+	var panel := DotBallotPanel.new()
+	panel.local_voter = "u9"
+	add_child(panel)
+	panel.show_state(_ballot_state("both"))
+	_check(panel.is_in_group(&"dot_pointer_modal"), "the ballot is in the pointer-modal group a host reads")
+	panel._input(_key(panel.pointer_key))
+	_check(panel.is_pointer_mode(), "the ballot frees the mouse")
+	var outside := _click()
+	outside.position = panel.get_global_rect().end + Vector2(8, 8)
+	outside.global_position = outside.position
+	get_viewport().push_input(outside)
+	await get_tree().process_frame
+	_check(probe.seen == 0, "a click outside the ballot's rows is consumed, so a host's click-to-capture never sees it")
+
+	var stack := DotScreenStack.new()
+	stack.register_service = false
+	stack.config = DotUiConfig.new()
+	stack.config.allow_pause = false
+	add_child(stack)
+	var pause := DotPauseScreen.new()
+	pause.name = "Pause"
+	var _b := pause.build(PackedStringArray(["Resume"]))
+	var board := DotScoreboardScreen.new()
+	var visible_screen := _make_screen(&"modal")
+	visible_screen.mouse_mode = DotScreen.Mouse.VISIBLE
+	for each in [pause, board, visible_screen]:
+		var _r := stack.register(each)
+	for id in [&"pause", &"scoreboard", &"modal"]:
+		var _p := stack.push(id)
+		var _q := stack.pop(id)
+		_check(stack.wanted_mouse_mode() == Input.MOUSE_MODE_VISIBLE,
+			"%s closing leaves the mouse free while the ballot holds it" % id)
+
+	# Ballot back to the captured game; a screen's own mouse wish applies again.
+	panel._input(_key(panel.pointer_key))
+	_check(stack.wanted_mouse_mode() == Input.MOUSE_MODE_CAPTURED, "the ballot back to the game, the idle stack captures again")
+	for id in [&"pause", &"modal"]:
+		var _p := stack.push(id)
+		get_viewport().push_input(_click())
+		await get_tree().process_frame
+		_check(stack.wanted_mouse_mode() == Input.MOUSE_MODE_VISIBLE, "%s: with the ballot back to the game, the open screen still wants the mouse free" % id)
+		var _q := stack.pop(id)
+
+	Input.mouse_mode = saved
+	stack.queue_free()
+	panel.queue_free()
+	probe.queue_free()
+	_done()
+
+
 func _test_ballot_avatar_rows() -> void:
 	print("")
 	_section("ballot panel: the avatar sits on the row marked as the voter's")

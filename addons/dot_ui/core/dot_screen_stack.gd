@@ -413,26 +413,40 @@ func _apply_mouse() -> void:
 	if not manage_mouse:
 		return
 
+	var mode := wanted_mouse_mode()
+	if mode >= 0 and Input.mouse_mode != mode:
+		Input.mouse_mode = mode as Input.MouseMode
+
+
+## The mouse mode the stack wants now, or -1 to leave it alone. A headless display keeps no captured mode, so a suite reads this rather than [member Input.mouse_mode].
+func wanted_mouse_mode() -> int:
 	var wanted := idle_mouse_mode
 	var current := top()
 
 	if current != null and current.mouse_mode != DotScreen.Mouse.INHERIT:
 		wanted = current.mouse_mode
 
-	var mode := Input.MOUSE_MODE_VISIBLE
+	if wanted != DotScreen.Mouse.VISIBLE and _pointer_modal_open():
+		wanted = DotScreen.Mouse.VISIBLE
 
 	match wanted:
 		DotScreen.Mouse.CAPTURED:
-			mode = Input.MOUSE_MODE_CAPTURED
+			return Input.MOUSE_MODE_CAPTURED
 		DotScreen.Mouse.CONFINED:
-			mode = Input.MOUSE_MODE_CONFINED
+			return Input.MOUSE_MODE_CONFINED
 		DotScreen.Mouse.INHERIT:
-			return
-		_:
-			mode = Input.MOUSE_MODE_VISIBLE
+			return -1
+	return Input.MOUSE_MODE_VISIBLE
 
-	if Input.mouse_mode != mode:
-		Input.mouse_mode = mode
+
+## Whether a node outside the stack (a ballot) has freed the mouse; a screen closing must not take it back.
+func _pointer_modal_open() -> bool:
+	if not is_inside_tree():
+		return false
+	for node in get_tree().get_nodes_in_group(&"dot_pointer_modal"):
+		if node.has_method(&"is_pointer_mode") and bool(node.call(&"is_pointer_mode")):
+			return true
+	return false
 
 
 func _apply_pause() -> void:

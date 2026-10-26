@@ -65,6 +65,9 @@ const COVER_GROUP := &"dot_hud_cover"
 ## Rows drawn at most. A ballot is at most a handful; the number keys reach ten.
 const MAX_ROWS := 10
 
+## The group of every node that frees the mouse for a modal of its own and says so with [code]pointer_mode_changed(on)[/code] and [code]is_pointer_mode()[/code]. A host that owns the mouse (dot-game's client, [DotScreenStack]) reads it by name, so neither names the other.
+const POINTER_GROUP := &"dot_pointer_modal"
+
 ## The key that frees the mouse for clicking, under [code]pointer[/code] or [code]both[/code].
 ##
 ## F3 by default: not a movement key, not a weapon slot, and not the chat or console key
@@ -134,6 +137,10 @@ const PENDING_MS := 3000
 var _pending_choice := -1
 var _pending_until_ms := 0
 var _pending_ids := PackedStringArray()
+
+
+func _init() -> void:
+	add_to_group(POINTER_GROUP)
 
 
 func _ready() -> void:
@@ -382,7 +389,9 @@ func _input(event: InputEvent) -> void:
 
 		if at >= 0:
 			choose(at)
-			get_viewport().set_input_as_handled()
+
+		# A click beside the rows is still the player using the free mouse, and unhandled it would reach a host that recaptures on click.
+		get_viewport().set_input_as_handled()
 
 
 static func _number_of(key: Key) -> int:

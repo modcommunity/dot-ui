@@ -81,7 +81,7 @@ var target: DotCrosshair = null
 
 func _set_and_apply(cvar: String, value: String) -> Variant:
 	if not set_cvar(cvar, value):
-		return "unreadable value: " + value
+		return DotResult.fail(DotError.CODE_INVALID, "unreadable value: " + value)
 	if target != null and is_instance_valid(target):
 		apply_to(target)
 	return null

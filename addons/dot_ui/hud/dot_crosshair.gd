@@ -152,6 +152,9 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
+## Per-weapon multiplier on the whole gap (a sniper opens wider, an automatic sits tighter).
+var gap_scale: float = 1.0
+
 ## Pixels from the centre the arms sit at, for the current spread.
 ##
 ## The projection a camera actually uses: half the viewport height divided by the
@@ -159,17 +162,17 @@ func _process(delta: float) -> void:
 ## angle through that is the radius the shots could land in.
 func gap_pixels() -> float:
 	if _spread_degrees <= 0.0 or not dynamic:
-		return base_gap
+		return base_gap * gap_scale
 
 	var height := size.y
 
 	if height <= 0.0:
-		return base_gap
+		return base_gap * gap_scale
 
 	var focal := (height * 0.5) / tan(deg_to_rad(fov_degrees) * 0.5)
 	var radius := focal * tan(deg_to_rad(_spread_degrees))
 
-	return minf(max_gap, base_gap + radius)
+	return minf(max_gap, (base_gap + radius) * gap_scale)
 
 
 func _draw() -> void:

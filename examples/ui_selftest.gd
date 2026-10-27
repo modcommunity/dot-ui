@@ -13,7 +13,7 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 414
+const CHECKS := 416
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -927,6 +927,20 @@ func _test_crosshair() -> void:
 		"a narrower field of view opens it further for the same angle",
 		"%.1f vs %.1f" % [narrow, wide]
 	)
+
+	var ladder: Array[float] = []
+	for deg: float in [0.5, 1.5, 3.5, 6.0]:
+		spread[0] = deg
+		crosshair.refresh()
+		ladder.append(crosshair.gap_pixels())
+	_check(ladder[0] < ladder[1] and ladder[1] < ladder[2] and ladder[2] < ladder[3], "the gap grows with every step of spread (still, walk, run, air)", str(ladder))
+
+	spread[0] = 1.5
+	crosshair.refresh()
+	var usual := crosshair.gap_pixels()
+	crosshair.gap_scale = 1.25
+	_check(is_equal_approx(crosshair.gap_pixels(), minf(crosshair.max_gap, usual * 1.25)), "gap_scale multiplies the whole gap", "%.1f" % usual)
+	crosshair.gap_scale = 1.0
 
 	spread[0] = 80.0
 	crosshair.refresh()

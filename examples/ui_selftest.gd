@@ -13,7 +13,7 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 416
+const CHECKS := 418
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -294,6 +294,13 @@ func _test_hud_fit() -> void:
 	_close(on_screen.size.x, ammo.footprint().size.x * hud.fit(), "a piece inside it is drawn at the HUD's scale", 0.5)
 	hud.fit_to_frame(Vector2(1600.0, 900.0))
 	_close(hud.fit(), 1.0, "and back at full size on a big frame")
+	var fm := DotFireModeIndicator.new()
+	fm.size = Vector2(200.0, 26.0)
+	fm.show_modes([&"burst", &"auto"], &"auto")
+	_check(fm.available == [&"auto", &"burst"] and fm.footprint().size.x == 88.0, "the fire-mode indicator draws only the modes on offer, in a fixed order")
+	fm.show_modes([&"semi"], &"semi")
+	_check(fm.footprint().size == Vector2.ZERO, "and nothing for a gun with one mode")
+	fm.free()
 	hud.user_scale = 0.8
 	hud.fit_to_frame(Vector2(1600.0, 900.0))
 	_close(hud.fit(), 0.8, "the player's HUD size multiplies the fit")

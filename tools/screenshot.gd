@@ -256,6 +256,12 @@ func _build_pieces(kind: String) -> void:
 	_place(hud, ammo, Control.PRESET_BOTTOM_RIGHT, Rect2(-300.0, -84.0, 290.0, 70.0))
 	ammo.show_ammo("Assault rifle", 7, 120, true)
 
+	# The three states of the fire-mode indicator, stacked above the ammo plate.
+	for i in range(3):
+		var fm := DotFireModeIndicator.new()
+		_place(hud, fm, Control.PRESET_BOTTOM_RIGHT, Rect2(-300.0, -122.0 - 32.0 * float(i), 290.0, 26.0))
+		fm.show_modes([&"auto", &"semi", &"burst"], [&"auto", &"semi", &"burst"][i])
+
 	var strip := DotScoreStrip.new()
 	_place(hud, strip, Control.PRESET_CENTER_TOP, Rect2(-260.0, 0.0, 520.0, 72.0))
 	strip.show_scores(23, 19, "BLUE", "RED", Color(0.22, 0.5, 0.95), Color(0.9, 0.24, 0.32))

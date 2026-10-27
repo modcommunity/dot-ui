@@ -27,5 +27,6 @@ extends RefCounted
 #    gamepad text entry (DotFormKeypad, DotUiForm.open_keypad, keypad, gamepad_entry).
 # 9: DotWinnerReveal, the end-of-match winner and podium (addons/dot_ui/screens/).
 # 10: DotCrosshair.dynamic and set_spread(); DotCrosshairCvars (cl_crosshair_* client cvars).
-const LEVEL := 10
+# 11: DotFireModeIndicator (A / one bullet / three bullets for the held gun's fire modes).
+const LEVEL := 11
 const OLDEST := 1

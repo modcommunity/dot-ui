@@ -1,6 +1,12 @@
 # HUD widgets and the theme
 
+## Weapon icons
+
+`DotIconSet` (`addons/dot_ui/icons/`) answers an icon by id, else by type tag, from a sprite sheet cut into cells, trimmed to the opaque pixels so a small sprite is not drawn small by its margin. Overrides (`override`, `load_overrides`) win over the sheet and may be per profile (`profile`); `flat` redraws every icon as one colour for a UI the pixel art would clash with; `silhouette_for` gives a flat copy to draw as a halo, which is what keeps dark sprite outlines readable on dark plates. `DotWeaponIcons.stock()` is the set with Jestan's CC0 sheet and thirty type tags; a game aliases its weapon ids to tags. Draw with `DotIconSet.pixel_perfect(canvas)` (nearest filtering) or enlarge by an integer first. Not here: which game weapon is which tag (the game's table), and the 3D view models these 2D side-on sprites cannot replace.
+
 ## Ships no art, names nothing outside dot-core
+
+The one exception is the optional icon sheet above (18 kB, CC0, credited in `icons/jestan/CREDITS.md`).
 
 `DotUiTheme` generates a whole `Theme` from `StyleBoxFlat`s and a palette. An addon that shipped textures would impose its art on every game that installed it, and the first thing anyone does is replace it. A game with a designed theme assigns one and `DotUiTheme` is never used; a game that wants to ship today gets something legible.
 

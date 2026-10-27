@@ -13,13 +13,13 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 418
+const CHECKS := 430
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 30
+const SECTIONS := 31
 
 
 func _ready() -> void:
@@ -59,6 +59,7 @@ func _run() -> void:
 	_test_damage_numbers()
 	_test_key_prompt_and_hints()
 	_test_winner_reveal()
+	_test_icon_set()
 	await _test_settings_screen()
 	await _test_scoreboard_screen()
 
@@ -127,6 +128,53 @@ func _test_scoreboard_screen() -> void:
 		"and a player with none keeps the column's width")
 
 	stack.queue_free()
+	_done()
+
+
+func _test_icon_set() -> void:
+	_section("icon set: tags, aliases, overrides, flat")
+
+	var set := DotWeaponIcons.stock()
+	var pistol := set.texture_for(&"pistol") as AtlasTexture
+	_check(pistol != null and pistol.region.size.x > 0.0 and pistol.region.size.x <= 48.0, "a stock tag is a trimmed sprite")
+	_check(set.texture_for(&"nonsense") == null and not set.has_icon(&"nonsense"), "an unknown id has no icon, so the caller draws the name")
+	_check(set.texture_for(&"zz", &"shotgun") != null, "an unknown id falls back to its type tag")
+	set.alias(&"sidearm", &"revolver")
+	_check(set.texture_for(&"sidearm") == set.texture_for(&"revolver"), "an alias draws what its target draws")
+	var plain := GradientTexture2D.new()
+	set.override(&"sidearm", plain)
+	_check(set.texture_for(&"sidearm") == plain, "an override beats the stock sprite")
+	var mine := GradientTexture2D.new()
+	set.override(&"sidearm", mine, &"retro")
+	_check(set.texture_for(&"sidearm") == plain, "another profile's override is not used")
+	set.profile = &"retro"
+	_check(set.texture_for(&"sidearm") == mine, "the active profile's override wins over the shared one")
+	set.profile = &""
+	set.load_overrides({"knife": plain, "retro": {"pistol": mine}})
+	_check(set.texture_for(&"knife") == plain, "a document's flat entry is a shared override")
+	set.profile = &"retro"
+	_check(set.texture_for(&"pistol") == mine, "a document's nested entry is that profile's")
+	set.profile = &""
+	set.flat = true
+	set.flat_colour = Color(1.0, 0.5, 0.0)
+	var flat := set.texture_for(&"smg")
+	var image := flat.get_image()
+	var lit := 0
+	var other := 0
+	for y in image.get_height():
+		for x in image.get_width():
+			var c := image.get_pixel(x, y)
+			if c.a > 0.0:
+				if absf(c.r - 1.0) < 0.01 and absf(c.g - 0.5) < 0.01 and c.b < 0.01:
+					lit += 1
+				else:
+					other += 1
+	_check(lit > 20 and other == 0, "flat redraws every opaque pixel in one colour")
+	var canvas := Control.new()
+	DotIconSet.pixel_perfect(canvas)
+	_check(canvas.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "pixel_perfect sets nearest filtering")
+	canvas.free()
+	_check(DotWeaponIcons.TAGS.size() == 30 and DotWeaponIcons.stock().texture_for(&"launcher") != null, "every stock tag is mapped")
 	_done()
 
 

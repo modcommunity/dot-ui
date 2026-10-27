@@ -28,5 +28,7 @@ extends RefCounted
 # 9: DotWinnerReveal, the end-of-match winner and podium (addons/dot_ui/screens/).
 # 10: DotCrosshair.dynamic and set_spread(); DotCrosshairCvars (cl_crosshair_* client cvars).
 # 11: DotFireModeIndicator (A / one bullet / three bullets for the held gun's fire modes).
-const LEVEL := 11
+# 12: DotIconSet (icons by id or tag from a sheet, per-profile overrides, flat recolour) and
+#    DotWeaponIcons.stock(), Jestan's CC0 weapon sprites (addons/dot_ui/icons/).
+const LEVEL := 12
 const OLDEST := 1

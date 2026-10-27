@@ -115,6 +115,10 @@ godot --headless --path . res://examples/ui_selftest.tscn
 
 136 checks, all offline, nothing rendered. Exits non-zero on any failure.
 
+## Art credit
+
+The one exception to "no art" is an optional 18 kB weapon icon sheet: Jestan's [The Ultimate Weapons Pack](https://jestan.itch.io/weapons-pack), CC0 1.0 (the itch.io page says so, and the author confirms in its comment thread that the licence file inside the zip is outdated). `DotIconSet` works with no sheet; `DotWeaponIcons.stock()` adds this one. Details in `addons/dot_ui/icons/jestan/CREDITS.md`.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

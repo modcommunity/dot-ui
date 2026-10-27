@@ -4,8 +4,8 @@ extends Node
 ##
 ## godot --headless --path . res://examples/form_selftest.tscn
 
-const CHECKS := 164
-const SECTIONS := 11
+const CHECKS := 173
+const SECTIONS := 12
 
 var _passed := 0
 var _failed := 0
@@ -171,6 +171,27 @@ func _test_reset() -> void:
 	_check(form.row("damage")._slider.value == 24.0, "and moves the slider")
 	form.reset_key("tags")
 	_check(form.values()["tags"] == ["sidearm", "starter"], "list reset")
+	_done()
+
+	_section("per-row undo")
+	await _fresh({"damage": 40.0})
+	_check(form.row("damage")._undo.disabled, "an untouched row offers no undo")
+	form.set_value("damage", 70.0)
+	_check(not form.row("damage")._undo.disabled, "an edited row offers undo")
+	form.set_value("fire_rate", 9.0)
+	var undone := []
+	form.key_undone.connect(func(k: String) -> void: undone.append(k))
+	form.row("damage")._undo.pressed.emit()
+	_check(form.values()["damage"] == 40.0 and undone == ["damage"], "Undo restores the opening value, not the default, and signals")
+	_check(form.row("damage")._slider.value == 40.0, "and moves the slider")
+	_check(form.changes().keys() == ["fire_rate"], "other edits stay")
+	_check(form.row("damage")._undo.disabled and not form.row("damage").is_modified(), "the row is clean again")
+	form.undo_key("fire_rate")
+	_check(not form.is_dirty() and form.changes().is_empty(), "undoing every edit leaves the form clean")
+	form.apply()
+	form.set_value("damage", 10.0)
+	form.undo_key("damage")
+	_check(form.values()["damage"] == 40.0, "after apply, undo goes to the applied value")
 	_done()
 
 

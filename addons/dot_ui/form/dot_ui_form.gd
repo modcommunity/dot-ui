@@ -5,6 +5,7 @@ extends PanelContainer
 
 signal value_changed(key: String, value: Variant)
 signal key_reset(key: String)
+signal key_undone(key: String)
 signal dirty_changed(dirty: bool)
 signal validation_changed(errors: Dictionary)
 ## The keys that changed since the last apply, with their new values.
@@ -138,6 +139,15 @@ func reset_key(key: String) -> void:
 	(_rows[key] as DotFormRow).show_value(def)
 	_accept(key, def, "")
 	key_reset.emit(key)
+
+
+## Puts one key back to the value it had when the form opened (the baseline), clearing its error.
+func undo_key(key: String) -> void:
+	if not _fields.has(key):
+		return
+	(_rows[key] as DotFormRow).show_value(_baseline[key])
+	_accept(key, _baseline[key], "")
+	key_undone.emit(key)
 
 
 ## Keeps the edits as the new baseline and emits [signal applied]; fails while any field is invalid.
@@ -355,6 +365,7 @@ func _build_rows() -> void:
 		r.show_value(_current[f["name"]])
 		r.edited.connect(_on_row_edited)
 		r.reset_requested.connect(reset_key)
+		r.undo_requested.connect(undo_key)
 		r.keypad_requested.connect(func(edit: LineEdit, numeric: bool) -> void:
 			if gamepad_entry:
 				open_keypad(edit, numeric))

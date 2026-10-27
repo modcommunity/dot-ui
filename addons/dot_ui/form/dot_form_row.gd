@@ -6,6 +6,7 @@ extends MarginContainer
 ## [param error] is empty when [param value] is valid; otherwise [param value] is the last good one.
 signal edited(key: String, value: Variant, error: String)
 signal reset_requested(key: String)
+signal undo_requested(key: String)
 ## A controller pressed accept on a text box; the form decides whether to open its on-screen keyboard.
 signal keypad_requested(edit: LineEdit, numeric: bool)
 
@@ -27,6 +28,8 @@ var _name: Label
 var _desc: Label
 var _err: Label
 var _reset: Button
+var _undo: Button
+var _actions: HBoxContainer
 var _unit: Label
 var _slider: DotFormSlider
 var _entry: LineEdit
@@ -82,6 +85,20 @@ func build(p_field: Dictionary, p_tokens: DotFormTokens) -> void:
 	_line = line
 	_right = right
 	_build_editor(line)
+	_actions = HBoxContainer.new()
+	_actions.add_theme_constant_override("separation", 0)
+	_actions.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	line.add_child(_actions)
+	_undo = Button.new()
+	_undo.theme_type_variation = &"FormReset"
+	_undo.text = "Undo"
+	_undo.tooltip_text = "Back to the value when this form opened"
+	_undo.pressed.connect(func() -> void: undo_requested.emit(key))
+	_undo.modulate.a = 0.0
+	_undo.focus_mode = Control.FOCUS_NONE
+	_undo.disabled = true
+	_undo.custom_minimum_size.y = tokens.target()
+	_actions.add_child(_undo)
 	_reset = Button.new()
 	_reset.theme_type_variation = &"FormReset"
 	_reset.text = "Reset"
@@ -89,9 +106,8 @@ func build(p_field: Dictionary, p_tokens: DotFormTokens) -> void:
 	_reset.pressed.connect(func() -> void: reset_requested.emit(key))
 	_reset.modulate.a = 0.0
 	_reset.focus_mode = Control.FOCUS_NONE
-	_reset.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_reset.custom_minimum_size.y = tokens.target()
-	line.add_child(_reset)
+	_actions.add_child(_reset)
 	_err = Label.new()
 	_err.theme_type_variation = &"FormError"
 	_err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -182,14 +198,14 @@ func set_compact(on: bool) -> void:
 	_box.vertical = on
 	_box.get_child(0).size_flags_stretch_ratio = 1.0 if on else 0.8
 	_box.get_child(1).size_flags_stretch_ratio = 1.0 if on else 1.2
-	if _list != null and _reset != null:
+	if _actions != null:
 		var home: Node = _right if on else _line
-		if _reset.get_parent() != home:
-			_reset.get_parent().remove_child(_reset)
-			home.add_child(_reset)
+		if _actions.get_parent() != home:
+			_actions.get_parent().remove_child(_actions)
+			home.add_child(_actions)
 			if on:
-				_right.move_child(_reset, 1)
-		_reset.size_flags_horizontal = Control.SIZE_SHRINK_END if on else Control.SIZE_FILL
+				_right.move_child(_actions, 1)
+		_actions.size_flags_horizontal = Control.SIZE_SHRINK_END if on else Control.SIZE_FILL
 
 
 ## Shows [param v] without emitting; the row remembers it as the current value.
@@ -235,6 +251,10 @@ func type_text(text: String) -> String:
 func set_modified(on: bool) -> void:
 	_modified = on
 	tokens.go(self, self, "bar", 1.0 if on else 0.0, 0.2)
+	if _undo != null:
+		tokens.go(self, _undo, "modulate:a", 1.0 if on else 0.0, 0.14)
+		_undo.focus_mode = Control.FOCUS_ALL if on else Control.FOCUS_NONE
+		_undo.disabled = not on
 
 
 func is_modified() -> bool:

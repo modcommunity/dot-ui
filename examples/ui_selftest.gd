@@ -1036,7 +1036,8 @@ func _test_crosshair() -> void:
 	_close(crosshair.gap_pixels(), 9.0, "a static crosshair ignores the spread")
 	(seen[&"cl_crosshair_colour"] as Callable).call("ff0000")
 	_check(crosshair.colour.is_equal_approx(Color.RED), "colour is read from hex")
-	_check(str((seen[&"cl_crosshair_size"] as Callable).call("x")).begins_with("unreadable"), "a bad value is refused")
+	var bad = (seen[&"cl_crosshair_size"] as Callable).call("x")
+	_check(bad is DotResult and not (bad as DotResult).ok, "a bad value is refused")
 
 	crosshair.queue_free()
 	remove_child(crosshair)

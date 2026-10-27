@@ -23,7 +23,7 @@ Also requires **dot-profile** (`DotProfileSet`, `DotProfile`, `DotProfileRuntime
 | Path | What |
 | --- | --- |
 | `addons/dot_ui/core/` | `DotScreen`, `DotScreenStack`, `DotUiTheme`, `DotInputBinding` |
-| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair`, `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
+| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair` (`dynamic`, `set_spread`), `DotCrosshairCvars` (`cl_crosshair_*` client cvars, API 10), `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
 | `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
 | `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen`; `DotWinnerReveal`, the end-of-match winner and podium (its own layer, not a stack screen) |
 | `addons/dot_ui/form/` | `DotUiForm` (schema-driven form), `DotFormTokens`, `DotFormSchema`, `DotFormRow`, `DotFormGroup`, `DotFormSlider`, `DotFormToggle`, `DotFormKeypad` (on-screen keyboard); [docs/form.md](docs/form.md), `examples/form_demo.tscn`, `examples/form_selftest.tscn`, `tools/form_screenshot.sh` |

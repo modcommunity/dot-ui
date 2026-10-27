@@ -63,6 +63,9 @@ extends DotHudWidget
 ## answer. (`hidden` is taken — [Control] already has one.)
 @export var suppressed: bool = false
 
+## Open the gap with the spread. Off keeps it at [member base_gap].
+@export var dynamic: bool = true
+
 @export_group("Aiming")
 
 ## Aim fraction (0 at the hip, 1 fully aimed) at which the crosshair has faded out entirely.
@@ -98,6 +101,11 @@ func _ready() -> void:
 func _on_value(current: Variant) -> void:
 	_spread_degrees = float(current) if typeof(current) != TYPE_NIL else 0.0
 	queue_redraw()
+
+
+## Sets the spread in degrees directly, for a game with no widget source bound.
+func set_spread(degrees: float) -> void:
+	_on_value(degrees)
 
 
 ## Flashes the crosshair. What a confirmed hit does.
@@ -150,7 +158,7 @@ func _process(delta: float) -> void:
 ## tangent of half the field of view gives the focal length in pixels, and the spread
 ## angle through that is the radius the shots could land in.
 func gap_pixels() -> float:
-	if _spread_degrees <= 0.0:
+	if _spread_degrees <= 0.0 or not dynamic:
 		return base_gap
 
 	var height := size.y

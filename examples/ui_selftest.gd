@@ -13,7 +13,7 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 407
+const CHECKS := 414
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -951,9 +951,36 @@ func _test_crosshair() -> void:
 	_close(crosshair.aim_opacity, 1.0, "and it returns whole")
 	_close(DotCrosshair.opacity_for_aim(NAN), 1.0, "a NaN aim draws the crosshair rather than hiding it")
 
+	var cvars := DotCrosshairCvars.new()
+	cvars.target = crosshair
+	var seen := {}
+	var local := _FakeLocal.new(seen)
+	_check(cvars.bind_console(local) and seen.has(&"cl_crosshair_gap") and seen.has(&"cl_crosshair_colour"), "every crosshair cvar is registered")
+	(seen[&"cl_crosshair_gap"] as Callable).call("9")
+	_close(crosshair.base_gap, 9.0, "a cvar reaches the widget")
+	(seen[&"cl_crosshair_style"] as Callable).call("1")
+	_check(not crosshair.top_arm, "style 1 is a T")
+	(seen[&"cl_crosshair_style"] as Callable).call("2")
+	_close(crosshair.length, 0.0, "style 2 is a dot")
+	(seen[&"cl_crosshair_dynamic"] as Callable).call("0")
+	crosshair.set_spread(5.0)
+	_close(crosshair.gap_pixels(), 9.0, "a static crosshair ignores the spread")
+	(seen[&"cl_crosshair_colour"] as Callable).call("ff0000")
+	_check(crosshair.colour.is_equal_approx(Color.RED), "colour is read from hex")
+	_check(str((seen[&"cl_crosshair_size"] as Callable).call("x")).begins_with("unreadable"), "a bad value is refused")
+
 	crosshair.queue_free()
 	remove_child(crosshair)
 	_done()
+
+
+class _FakeLocal:
+	extends RefCounted
+	var seen: Dictionary
+	func _init(into: Dictionary) -> void:
+		seen = into
+	func add_var(name: StringName, _help: String, _get: Callable, set_it: Callable) -> void:
+		seen[name] = set_it
 
 
 # --- Feed and table --------------------------------------------------------

@@ -26,5 +26,6 @@ extends RefCounted
 # 8: the form kit's list reorder (DotFormRow.move_item, the schema key `reorder`) and
 #    gamepad text entry (DotFormKeypad, DotUiForm.open_keypad, keypad, gamepad_entry).
 # 9: DotWinnerReveal, the end-of-match winner and podium (addons/dot_ui/screens/).
-const LEVEL := 9
+# 10: DotCrosshair.dynamic and set_spread(); DotCrosshairCvars (cl_crosshair_* client cvars).
+const LEVEL := 10
 const OLDEST := 1

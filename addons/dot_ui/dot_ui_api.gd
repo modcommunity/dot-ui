@@ -30,5 +30,6 @@ extends RefCounted
 # 11: DotFireModeIndicator (A / one bullet / three bullets for the held gun's fire modes).
 # 12: DotIconSet (icons by id or tag from a sheet, per-profile overrides, flat recolour) and
 #    DotWeaponIcons.stock(), Jestan's CC0 weapon sprites (addons/dot_ui/icons/).
-const LEVEL := 12
+# 13: DotWeaponIconStyle (a game's id-to-tag table, cl_weapon_icons / cl_weapon_icon_profile cvars, halo, menu card).
+const LEVEL := 13
 const OLDEST := 1

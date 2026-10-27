@@ -13,13 +13,13 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 430
+const CHECKS := 438
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 31
+const SECTIONS := 32
 
 
 func _ready() -> void:
@@ -60,6 +60,7 @@ func _run() -> void:
 	_test_key_prompt_and_hints()
 	_test_winner_reveal()
 	_test_icon_set()
+	_test_icon_style()
 	await _test_settings_screen()
 	await _test_scoreboard_screen()
 
@@ -2496,4 +2497,31 @@ func _test_chat_window() -> void:
 	window.queue_free()
 	InputMap.erase_action(&"probe_chat_open")
 	InputMap.erase_action(&"probe_chat_team")
+	_done()
+
+
+func _test_icon_style() -> void:
+	_section("weapon icon style: tags, cvars, filter")
+	var icons := DotWeaponIconStyle.new()
+	icons.overrides_path = "user://no_such_weapon_icons.json"
+	icons.tags = {&"my_gun": &"pistol", &"my_fist": &""}
+	_check(icons.texture(&"my_gun") is AtlasTexture and icons.texture(&"my_gun") == icons.icon_set().texture_for(&"pistol"), "a mapped id draws its tag's sprite")
+	_check(icons.texture(&"unmapped_thing") == null, "an unmapped id has no sprite")
+	_check(icons.set_style(&"silhouette") and icons.texture(&"my_gun") == null, "silhouette gives no sprite")
+	_check(not icons.set_style(&"bogus") and icons.style == &"silhouette", "an unknown style is refused and keeps the old one")
+	var _back := icons.set_style(&"pixel")
+	var seen := {}
+	var local := _FakeLocal.new(seen)
+	_check(icons.bind_console(local) and seen.has(&"cl_weapon_icons") and seen.has(&"cl_weapon_icon_profile"), "bind_console registers both cvars")
+	var res: Variant = (seen[&"cl_weapon_icons"] as Callable).call("flat")
+	_check(icons.style == &"flat" and not (res is DotResult and not res.ok), "setting cl_weapon_icons switches the style")
+	var bad: Variant = (seen[&"cl_weapon_icons"] as Callable).call("nope")
+	_check(bad is DotResult and not bad.ok and icons.style == &"flat", "a bad cvar value fails with a DotResult and changes nothing")
+	var canvas := Control.new()
+	icons.set_style(&"pixel")
+	icons.filter(canvas)
+	var nearest := canvas.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST
+	icons.filter(canvas, false)
+	_check(nearest and canvas.texture_filter == CanvasItem.TEXTURE_FILTER_PARENT_NODE, "filter is nearest for a sprite and inherited for a rendered model")
+	canvas.free()
 	_done()

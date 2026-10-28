@@ -217,26 +217,7 @@ func _build_pieces(kind: String) -> void:
 	_pieces.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_pieces)
 
-	var black := ColorRect.new()
-	black.color = Color(0.0, 0.0, 0.0)
-	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_pieces.add_child(black)
-	# Pale ground, the case that matters, with a dark block on the right third.
-	var floor_rect := ColorRect.new()
-	floor_rect.color = Color(0.88, 0.88, 0.85)
-	floor_rect.size = frame
-	_pieces.add_child(floor_rect)
-	for i in range(0, int(frame.x), 64):
-		var line := ColorRect.new()
-		line.color = Color(0.72, 0.72, 0.70)
-		line.position = Vector2(float(i), 0.0)
-		line.size = Vector2(2.0, frame.y)
-		_pieces.add_child(line)
-	var block := ColorRect.new()
-	block.color = Color(0.16, 0.18, 0.22)
-	block.position = Vector2(frame.x * 0.66, frame.y * 0.25)
-	block.size = Vector2(frame.x * 0.34, frame.y * 0.75)
-	_pieces.add_child(block)
+	_build_floor(frame)
 
 	var hud := DotHud.new()
 	hud.name = "PiecesHud"
@@ -287,6 +268,41 @@ func _build_pieces(kind: String) -> void:
 	numbers.add_at(1, 27.0, centre + Vector2(140.0, 40.0))
 	numbers.add_at(2, 104.0, centre + Vector2(-170.0, 10.0), true)
 
+	_build_cover_stand_in(hud, frame)
+
+	if kind == "small":
+		var edge := ReferenceRect.new()
+		edge.border_color = Color(1.0, 0.2, 0.8)
+		edge.border_width = 2.0
+		edge.editor_only = false
+		edge.size = frame
+		_pieces.add_child(edge)
+
+
+func _build_floor(frame: Vector2) -> void:
+	var black := ColorRect.new()
+	black.color = Color(0.0, 0.0, 0.0)
+	black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pieces.add_child(black)
+	# Pale ground, the case that matters, with a dark block on the right third.
+	var floor_rect := ColorRect.new()
+	floor_rect.color = Color(0.88, 0.88, 0.85)
+	floor_rect.size = frame
+	_pieces.add_child(floor_rect)
+	for i in range(0, int(frame.x), 64):
+		var line := ColorRect.new()
+		line.color = Color(0.72, 0.72, 0.70)
+		line.position = Vector2(float(i), 0.0)
+		line.size = Vector2(2.0, frame.y)
+		_pieces.add_child(line)
+	var block := ColorRect.new()
+	block.color = Color(0.16, 0.18, 0.22)
+	block.position = Vector2(frame.x * 0.66, frame.y * 0.25)
+	block.size = Vector2(frame.x * 0.34, frame.y * 0.75)
+	_pieces.add_child(block)
+
+
+func _build_cover_stand_in(hud: Control, frame: Vector2) -> void:
 	# A client shell's ballot column, stand-in: in the cover group, over a right-hand hint
 	# column, which must come out dimmed.
 	var right_hints := DotKeyHints.new()
@@ -304,14 +320,6 @@ func _build_pieces(kind: String) -> void:
 	cover_label.text = "cover stand-in\n(dot_hud_cover)"
 	cover_label.position = Vector2(12.0, 8.0)
 	cover.add_child(cover_label)
-
-	if kind == "small":
-		var edge := ReferenceRect.new()
-		edge.border_color = Color(1.0, 0.2, 0.8)
-		edge.border_width = 2.0
-		edge.editor_only = false
-		edge.size = frame
-		_pieces.add_child(edge)
 
 
 func _place(hud: Control, piece: Control, preset: Control.LayoutPreset, rect: Rect2) -> void:

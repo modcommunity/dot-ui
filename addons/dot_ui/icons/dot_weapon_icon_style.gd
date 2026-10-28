@@ -2,13 +2,7 @@ class_name DotWeaponIconStyle
 extends RefCounted
 
 ## A game's weapon pictures: the stock sprite sheet, the game's id-to-tag table, the player's overrides and the `cl_weapon_icons` cvars.
-##
-## [codeblock]
-## var icons := DotWeaponIconStyle.new()
-## icons.tags = {&"zz_ak": &"assault_rifle"}   # or subclass and set it in _init
-## icons.bind_console(console_local_source)
-## var tex := icons.texture(weapon_id)           # null: draw the name or the rendered model
-## [/codeblock]
+## Set `tags` (or subclass), `bind_console(console_local_source)`, then `texture(weapon_id)`; null means draw the name or model.
 
 ## `pixel` is the sprites as drawn, `flat` one colour, `silhouette` no sprite (the caller draws its rendered model).
 const STYLES := [&"pixel", &"flat", &"silhouette"]

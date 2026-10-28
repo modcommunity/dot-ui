@@ -2,10 +2,9 @@
 class_name DotFireModeIndicator
 extends DotHudPiece
 
-## The fire modes the held gun offers, in a row: "A" for auto, one bullet for semi, three bullets
-## for burst. The selected one is lit, the others dim, and a mode the gun lacks is not drawn. A gun
-## with a single mode draws nothing. Place it by the ammo counter; the host feeds it from
-## `DotWeaponArsenal.fire_modes_available()` and `fire_mode()` (this addon does not depend on dot-weapon).
+## The fire modes the held gun offers: "A" auto, one bullet semi, three burst; selected lit, others dim.
+## A gun with one mode draws nothing. The host feeds it from `DotWeaponArsenal.fire_modes_available()`
+## and `fire_mode()` (this addon does not depend on dot-weapon).
 
 const AUTO := &"auto"
 const SEMI := &"semi"

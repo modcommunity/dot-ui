@@ -2,13 +2,7 @@ class_name DotCrosshairCvars
 extends RefCounted
 
 ## The player's own crosshair as client cvars (`cl_crosshair_*`, archived, never replicated).
-##
-## [codeblock]
-## var cvars := DotCrosshairCvars.new()
-## cvars.target = crosshair
-## cvars.bind_console(console_local_source)
-## cvars.apply_to(crosshair)
-## [/codeblock]
+## Set `target`, call `bind_console(console_local_source)`, then `apply_to(crosshair)`.
 
 signal changed
 

@@ -84,6 +84,16 @@ func _test_crosshair() -> void:
 	crosshair.refresh()
 	_close(crosshair.gap_pixels(), 200.0, "and it is capped")
 
+	_crosshair_aim_checks(crosshair)
+
+	_crosshair_cvar_checks(crosshair)
+
+	crosshair.queue_free()
+	remove_child(crosshair)
+	_done()
+
+
+func _crosshair_aim_checks(crosshair: DotCrosshair) -> void:
 	# Aiming down the sights: the crosshair fades out, and back, never snaps.
 	var aim := [0.0]
 	crosshair.aim_source = func() -> float: return aim[0]
@@ -102,12 +112,6 @@ func _test_crosshair() -> void:
 	crosshair.follow_aim(1.0)
 	_close(crosshair.aim_opacity, 1.0, "and it returns whole")
 	_close(DotCrosshair.opacity_for_aim(NAN), 1.0, "a NaN aim draws the crosshair rather than hiding it")
-
-	_crosshair_cvar_checks(crosshair)
-
-	crosshair.queue_free()
-	remove_child(crosshair)
-	_done()
 
 
 func _crosshair_cvar_checks(crosshair: DotCrosshair) -> void:

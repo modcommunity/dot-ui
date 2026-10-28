@@ -48,8 +48,6 @@ signal pointer_mode_changed(on: bool)
 ## The ballot went away: it closed and its result has been shown, or the server took it down.
 signal dismissed()
 
-const CHANNEL := "ui.ballot"
-
 ## The group a panel is in from the moment it exists: [b]how a game learns a ballot is on its
 ## screen[/b] without being told. The panel is usually drawn by something the game did not
 ## build and cannot reach — a client shell's overlay, over a delivered game — and a top-right

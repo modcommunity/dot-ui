@@ -13,7 +13,7 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 438
+const CHECKS := 439
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -613,6 +613,24 @@ func _test_screen_stack() -> void:
 	var clash := _make_screen(&"menu")
 	_check(not stack.register(clash).ok, "two screens with one id is refused")
 	clash.queue_free()
+
+	# registered_ids() must be alphabetical text, not StringName interning order.
+	var order_stack := _make_stack()
+	var made: Array[DotScreen] = []
+	for n in ["zq_ids", "yq_ids", "xq_ids", "wq_ids", "vq_ids", "uq_ids", "tq_ids", "sq_ids"]:
+		var sc := _make_screen(StringName(n))
+		made.append(sc)
+		order_stack.register(sc)
+	var ids_listed := PackedStringArray()
+	for sid in order_stack.registered_ids():
+		ids_listed.append(String(sid))
+	var ids_sorted := ids_listed.duplicate()
+	ids_sorted.sort()
+	_check(
+		ids_listed == ids_sorted and ids_listed.size() == 8,
+		"registered_ids() is sorted by text (%s)" % [ids_listed],
+		"Array.sort() on StringNames orders by interning"
+	)
 
 	_check(stack.push(&"menu").ok, "pushing opens a screen")
 	_check(stack.top_id() == &"menu", "which is then on top")

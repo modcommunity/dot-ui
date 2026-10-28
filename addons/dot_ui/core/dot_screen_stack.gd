@@ -183,10 +183,14 @@ func screen(id: StringName) -> DotScreen:
 
 
 func registered_ids() -> Array[StringName]:
-	var out: Array[StringName] = []
+	# Sorted as text: StringName order is interning order.
+	var texts := PackedStringArray()
 	for key in _registered.keys():
-		out.append(key)
-	out.sort()
+		texts.append(String(key))
+	texts.sort()
+	var out: Array[StringName] = []
+	for t in texts:
+		out.append(StringName(t))
 	return out
 
 

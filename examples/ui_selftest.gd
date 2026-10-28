@@ -13,7 +13,7 @@ extends "selftest/selftest_base.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 439
+const CHECKS := 445
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -961,8 +961,30 @@ func _test_stat_bar() -> void:
 	_done()
 
 
+func _crosshair_alive_checks() -> void:
+	var c := DotCrosshair.new()
+	add_child(c)
+	_check(c.is_shown(), "a crosshair is shown by default")
+	var alive := [false]
+	c.alive_source = func() -> bool: return alive[0]
+	c._process(0.016)
+	_check(not c.is_shown(), "hidden while the alive source says dead")
+	alive[0] = true
+	c._process(0.016)
+	_check(c.is_shown(), "shown again once alive")
+	c.alive_source = Callable()
+	c.set_alive(false)
+	_check(not c.is_shown(), "set_alive(false) hides it")
+	c.hide_when_dead = false
+	_check(c.is_shown(), "hide_when_dead = false opts out")
+	_check(c.describe().get("alive") == false, "describe reports alive")
+	remove_child(c)
+	c.free()
+
+
 func _test_crosshair() -> void:
 	_section("crosshair")
+	_crosshair_alive_checks()
 
 	var crosshair := DotCrosshair.new()
 	crosshair.base_gap = 4.0

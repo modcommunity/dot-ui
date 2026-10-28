@@ -66,6 +66,16 @@ extends DotHudWidget
 ## Open the gap with the spread. Off keeps it at [member base_gap].
 @export var dynamic: bool = true
 
+@export_group("Alive")
+
+## Draw nothing while the viewer's player is dead, spectating or watching a kill view: there is
+## no gun in hand to aim. Opt out with false for a game whose crosshair is always on.
+@export var hide_when_dead: bool = true
+
+## `func() -> bool`: whether the viewer's player is alive, read every frame. Unset is alive
+## unless [method set_alive] is called.
+var alive_source: Callable = Callable()
+
 @export_group("Aiming")
 
 ## Aim fraction (0 at the hip, 1 fully aimed) at which the crosshair has faded out entirely.
@@ -85,6 +95,7 @@ var aim_source: Callable = Callable()
 var aim_opacity: float = 1.0
 
 var _aim: float = 0.0
+var _alive: bool = true
 var _spread_degrees: float = 0.0
 var _hit_until_ms: int = 0
 
@@ -106,6 +117,18 @@ func _on_value(current: Variant) -> void:
 ## Sets the spread in degrees directly, for a game with no widget source bound.
 func set_spread(degrees: float) -> void:
 	_on_value(degrees)
+
+
+## Pushes whether the viewer's player is alive, for a game with no callable to hand over.
+func set_alive(alive: bool) -> void:
+	if alive != _alive:
+		_alive = alive
+		queue_redraw()
+
+
+## Whether the crosshair is drawn now: not suppressed, not faded out, not dead (if hiding).
+func is_shown() -> bool:
+	return not suppressed and aim_opacity > 0.01 and (_alive or not hide_when_dead)
 
 
 ## Flashes the crosshair. What a confirmed hit does.
@@ -145,6 +168,8 @@ func follow_aim(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	if alive_source.is_valid():
+		set_alive(bool(alive_source.call()))
 	follow_aim(delta)
 
 	if _hit_until_ms > 0 and Time.get_ticks_msec() >= _hit_until_ms:
@@ -176,7 +201,7 @@ func gap_pixels() -> float:
 
 
 func _draw() -> void:
-	if suppressed or aim_opacity <= 0.01:
+	if not is_shown():
 		return
 
 	var centre := size * 0.5
@@ -221,6 +246,7 @@ func describe() -> Dictionary:
 	out["spread"] = _spread_degrees
 	out["gap"] = gap_pixels()
 	out["suppressed"] = suppressed
+	out["alive"] = _alive
 	out["aim"] = _aim
 	out["aim_opacity"] = aim_opacity
 	return out

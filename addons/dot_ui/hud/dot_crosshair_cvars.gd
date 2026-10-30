@@ -16,6 +16,7 @@ const FIELDS := {
 	&"dot": [1.0, 0.0, 1.0, "1 draws a centre dot"],
 	&"outline": [1.0, 0.0, 1.0, "1 draws a dark outline"],
 	&"dynamic": [1.0, 0.0, 1.0, "1 opens the gap with the weapon's spread"],
+	&"ease": [0.08, 0.0, 1.0, "Seconds the gap takes to close after the spread falls (0 snaps)"],
 }
 
 const COLOUR := "cl_crosshair_colour"
@@ -96,5 +97,6 @@ func apply_to(crosshair: DotCrosshair) -> void:
 	crosshair.centre_dot = values[&"dot"] > 0.5 or style == 2
 	crosshair.outline = values[&"outline"] > 0.5
 	crosshair.dynamic = values[&"dynamic"] > 0.5
+	crosshair.close_sec = float(values[&"ease"])
 	crosshair.colour = colour
 	crosshair.queue_redraw()

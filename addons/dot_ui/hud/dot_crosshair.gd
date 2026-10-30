@@ -110,8 +110,35 @@ func _ready() -> void:
 ## The widget's [member DotHudWidget.source] returns it, so a game binds one callable
 ## and nothing else.
 func _on_value(current: Variant) -> void:
-	_spread_degrees = float(current) if typeof(current) != TYPE_NIL else 0.0
+	_target_degrees = float(current) if typeof(current) != TYPE_NIL else 0.0
+	if close_sec <= 0.0 or _target_degrees >= _spread_degrees:
+		_spread_degrees = _target_degrees
 	queue_redraw()
+
+
+## Seconds a narrowing gap takes to close by two thirds; a widening one opens at once, so the drawn
+## cone is never tighter than the shots'. 0 snaps (`cl_crosshair_ease`).
+@export_range(0.0, 1.0, 0.01) var close_sec: float = 0.08
+
+var _target_degrees: float = 0.0
+
+
+## Eases the drawn spread toward the last one set; public so a suite can step it without a frame.
+func ease_spread(delta: float) -> void:
+	if _spread_degrees <= _target_degrees:
+		return
+	if close_sec <= 0.0:
+		_spread_degrees = _target_degrees
+	else:
+		_spread_degrees = lerpf(_target_degrees, _spread_degrees, exp(-delta / close_sec))
+		if _spread_degrees - _target_degrees < 0.001:
+			_spread_degrees = _target_degrees
+	queue_redraw()
+
+
+## The spread in degrees the gap is drawn for now.
+func spread_shown() -> float:
+	return _spread_degrees
 
 
 ## Sets the spread in degrees directly, for a game with no widget source bound.
@@ -171,6 +198,7 @@ func _process(delta: float) -> void:
 	if alive_source.is_valid():
 		set_alive(bool(alive_source.call()))
 	follow_aim(delta)
+	ease_spread(delta)
 
 	if _hit_until_ms > 0 and Time.get_ticks_msec() >= _hit_until_ms:
 		_hit_until_ms = 0

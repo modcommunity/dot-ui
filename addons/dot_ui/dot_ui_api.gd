@@ -32,5 +32,6 @@ extends RefCounted
 #    DotWeaponIcons.stock(), Jestan's CC0 weapon sprites (addons/dot_ui/icons/).
 # 13: DotWeaponIconStyle (a game's id-to-tag table, cl_weapon_icons / cl_weapon_icon_profile cvars, halo, menu card).
 # 14: DotCrosshair hides while the viewer is dead: hide_when_dead, alive_source, set_alive(), is_shown().
-const LEVEL := 14
+# 15: DotCrosshair eases a closing gap: close_sec, ease_spread(), spread_shown(); cl_crosshair_ease.
+const LEVEL := 15
 const OLDEST := 1

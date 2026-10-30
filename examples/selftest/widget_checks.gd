@@ -32,6 +32,7 @@ func _test_crosshair() -> void:
 	crosshair.base_gap = 4.0
 	crosshair.fov_degrees = 90.0
 	crosshair.max_gap = 200.0
+	crosshair.close_sec = 0.0
 	crosshair.size = Vector2(1920.0, 1080.0)
 
 	var spread := [0.0]
@@ -84,6 +85,8 @@ func _test_crosshair() -> void:
 	crosshair.refresh()
 	_close(crosshair.gap_pixels(), 200.0, "and it is capped")
 
+	_crosshair_ease_checks(crosshair)
+
 	_crosshair_aim_checks(crosshair)
 
 	_crosshair_cvar_checks(crosshair)
@@ -91,6 +94,21 @@ func _test_crosshair() -> void:
 	crosshair.queue_free()
 	remove_child(crosshair)
 	_done()
+
+
+func _crosshair_ease_checks(crosshair: DotCrosshair) -> void:
+	crosshair.close_sec = 0.08
+	crosshair.set_spread(1.0)
+	crosshair.ease_spread(1.0)
+	crosshair.set_spread(4.0)
+	_close(crosshair.spread_shown(), 4.0, "a widening spread opens the gap at once (never tighter than the shots)")
+	crosshair.set_spread(1.0)
+	_close(crosshair.spread_shown(), 4.0, "a falling one does not snap shut")
+	crosshair.ease_spread(0.08)
+	_check(crosshair.spread_shown() > 1.0 and crosshair.spread_shown() < 2.5, "it closes about two thirds in close_sec", "%.2f" % crosshair.spread_shown())
+	crosshair.ease_spread(1.0)
+	_close(crosshair.spread_shown(), 1.0, "and lands on the spread")
+	crosshair.close_sec = 0.0
 
 
 func _crosshair_aim_checks(crosshair: DotCrosshair) -> void:
@@ -129,6 +147,8 @@ func _crosshair_cvar_checks(crosshair: DotCrosshair) -> void:
 	(seen[&"cl_crosshair_dynamic"] as Callable).call("0")
 	crosshair.set_spread(5.0)
 	_close(crosshair.gap_pixels(), 9.0, "a static crosshair ignores the spread")
+	(seen[&"cl_crosshair_ease"] as Callable).call("0.2")
+	_close(crosshair.close_sec, 0.2, "cl_crosshair_ease sets how the gap closes")
 	(seen[&"cl_crosshair_colour"] as Callable).call("ff0000")
 	_check(crosshair.colour.is_equal_approx(Color.RED), "colour is read from hex")
 	var bad = (seen[&"cl_crosshair_size"] as Callable).call("x")

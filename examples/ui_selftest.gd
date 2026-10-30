@@ -13,7 +13,7 @@ extends "selftest/widget_checks.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 445
+const CHECKS := 450
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that

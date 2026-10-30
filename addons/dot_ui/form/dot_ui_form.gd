@@ -37,12 +37,14 @@ var _baseline := {}
 var _current := {}
 var _errors := {}
 var _filter := ""
+var _only_modified := false
 var _dirty := false
 var _compact := false
 var _built_touch := false
 var _rebuild_queued := false
 
 var _search: LineEdit
+var _modified_chip: Button
 var _title_label: Label
 var _sub: Label
 var _scroll: ScrollContainer
@@ -181,7 +183,20 @@ func set_filter(text: String) -> void:
 	for g in _tops:
 		any = _filter_group(g) or any
 	_empty.visible = not any
-	_empty.text = "Nothing matches \"%s\"" % _filter
+	_empty.text = "Nothing differs from the defaults" if _filter == "" else "Nothing matches \"%s\"" % _filter
+
+
+## Narrows the filter to settings that differ from their schema default. The set is taken when this is called (a row you reset stays until the next call), so a slider dragged to its default does not vanish under the hand.
+func set_only_modified(on: bool) -> void:
+	_only_modified = on
+	_scroll.scroll_vertical = 0
+	if _modified_chip != null and _modified_chip.button_pressed != on:
+		_modified_chip.set_pressed_no_signal(on)
+	set_filter(_filter)
+
+
+func only_modified() -> bool:
+	return _only_modified
 
 
 func filter() -> String:
@@ -325,13 +340,26 @@ func _construct() -> void:
 	_sub.theme_type_variation = &"FormCaption"
 	head.add_child(_sub)
 
+	var search_bar := HBoxContainer.new()
+	search_bar.add_theme_constant_override("separation", tokens.sp(2))
+	_shell.add_child(search_bar)
 	_search = LineEdit.new()
 	_search.placeholder_text = "Search settings"
 	_search.clear_button_enabled = true
 	_search.custom_minimum_size.y = tokens.target()
+	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_search.text_changed.connect(set_filter)
 	_search.gui_input.connect(_on_search_input)
-	_shell.add_child(_search)
+	search_bar.add_child(_search)
+	_modified_chip = Button.new()
+	_modified_chip.theme_type_variation = &"FormChip"
+	_modified_chip.toggle_mode = true
+	_modified_chip.text = "Modified"
+	_modified_chip.tooltip_text = "Only settings that differ from their default"
+	_modified_chip.custom_minimum_size.y = tokens.target()
+	_modified_chip.set_pressed_no_signal(_only_modified)
+	_modified_chip.toggled.connect(set_only_modified)
+	search_bar.add_child(_modified_chip)
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -341,7 +369,7 @@ func _construct() -> void:
 		_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_scroll.size_flags_vertical = Control.SIZE_FILL
 		head.visible = false
-		_search.visible = false
+		search_bar.visible = false
 	_shell.add_child(_scroll)
 	_content = VBoxContainer.new()
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -351,7 +379,7 @@ func _construct() -> void:
 	_build_rows()
 	outer.add_child(_build_footer())
 	_apply_compact()
-	if _filter != "":
+	if _filter != "" or _only_modified:
 		set_filter(_filter)
 
 
@@ -443,13 +471,13 @@ func _ensure_group(path: String, made: Dictionary) -> DotFormGroup:
 func _filter_group(g: DotFormGroup) -> bool:
 	var shown := false
 	for r in _group_rows[g]:
-		var m := (r as DotFormRow).matches(_filter)
+		var m := (r as DotFormRow).matches(_filter) and not (_only_modified and (r as DotFormRow).is_default() and not _errors.has((r as DotFormRow).key))
 		(r as DotFormRow).visible = m
 		shown = shown or m
 	for k in _group_kids[g]:
 		shown = _filter_group(k) or shown
 	g.visible = shown
-	g.set_forced(_filter != "")
+	g.set_forced(_filter != "" or _only_modified)
 	return shown
 
 

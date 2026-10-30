@@ -199,6 +199,14 @@ func _theme_buttons(th: Theme, ring: StyleBox, pad_h: int, pad_v: int) -> void:
 	th.set_color("font_hover_color", "FormGhost", text)
 	th.set_color("font_disabled_color", "FormGhost", text_faint)
 
+	th.set_type_variation("FormChip", "FormGhost")
+	var on := box(Color(accent, 0.22), radius - 2, accent, 1)
+	th.set_stylebox("normal", "FormChip", _pad(box(field, radius - 2), pad_h, pad_v))
+	for st in ["pressed", "hover_pressed"]:
+		th.set_stylebox(st, "FormChip", _pad(on, pad_h, pad_v))
+	for c in ["font_pressed_color", "font_hover_pressed_color"]:
+		th.set_color(c, "FormChip", accent)
+
 	th.set_type_variation("FormReset", "FormGhost")
 	th.set_color("font_color", "FormReset", accent)
 	th.set_color("font_hover_color", "FormReset", accent)

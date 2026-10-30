@@ -4,8 +4,8 @@ extends Node
 ##
 ## godot --headless --path . res://examples/form_selftest.tscn
 
-const CHECKS := 173
-const SECTIONS := 12
+const CHECKS := 183
+const SECTIONS := 13
 
 var _passed := 0
 var _failed := 0
@@ -26,6 +26,7 @@ func _run() -> void:
 	await _test_validation()
 	await _test_reset()
 	await _test_search()
+	await _test_modified_only()
 	await _test_dirty()
 	await _test_navigation()
 	await _test_layout()
@@ -220,6 +221,33 @@ func _test_search() -> void:
 			_check(g.is_shown_open(), "search opens a shut card")
 			form.set_filter("")
 			_check(not g.is_shown_open() and not g.open, "and shuts it again afterwards")
+	_done()
+
+
+func _test_modified_only() -> void:
+	_section("modified only")
+	await _fresh({"damage": 31.0, "automatic": true})
+	var all := form.visible_keys().size()
+	form.set_only_modified(true)
+	var keys := form.visible_keys()
+	_check(form.only_modified() and form._modified_chip.button_pressed, "the chip shows the state")
+	_check(keys.has("damage") and keys.has("automatic"), "keys off their default stay")
+	_check(keys.size() < all, "the rest hide (%d of %d)" % [keys.size(), all])
+	var plain := true
+	for k in keys:
+		plain = plain and not form.row(k).is_default()
+	_check(plain, "every shown key differs from its default")
+	form.reset_key("damage")
+	_check(form.visible_keys().has("damage"), "a reset row stays until the next pass")
+	form.set_only_modified(true)
+	_check(not form.visible_keys().has("damage"), "and leaves on it")
+	form.set_filter("auto")
+	_check(form.visible_keys() == PackedStringArray(["automatic"]), "combines with search")
+	form.set_filter("zzzz")
+	_check(form._empty.visible, "an empty result says so")
+	form.set_filter("")
+	form._modified_chip.toggled.emit(false)
+	_check(not form.only_modified() and form.visible_keys().size() == all, "the chip button turns it off")
 	_done()
 
 

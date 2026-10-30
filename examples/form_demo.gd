@@ -108,7 +108,9 @@ func _stage(n: String) -> void:
 		form.focus_key("tags")
 		(form.row("tags")._item_rows()[1].get_child(2) as Control).grab_focus()
 		return
-	if n.contains("search"):
+	if n.contains("modified"):
+		form.set_only_modified(true)
+	elif n.contains("search"):
 		form.set_filter("damage")
 	elif n.contains("collapsed"):
 		form.groups()[0].set_open(false, false)

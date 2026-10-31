@@ -34,5 +34,6 @@ extends RefCounted
 # 14: DotCrosshair hides while the viewer is dead: hide_when_dead, alive_source, set_alive(), is_shown().
 # 15: DotCrosshair eases a closing gap: close_sec, ease_spread(), spread_shown(); cl_crosshair_ease.
 # 16: DotUiForm.set_only_modified(), only_modified(): the Modified chip beside search.
-const LEVEL := 16
+# 17: DotVitals hosts the killstreak: show_streak(), streak_format, streak_icon, has_streak_row().
+const LEVEL := 17
 const OLDEST := 1

@@ -13,7 +13,7 @@ extends "selftest/widget_checks.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 450
+const CHECKS := 458
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -380,6 +380,23 @@ func _test_vitals() -> void:
 	_check(plain.size.x > v.bar_end and plain.size.y == 56.0, "the plate reaches past the bar to the number")
 	v.show_vitals(0.4, 100.0)
 	_check(v.number_text() == "1", "0.4 is alive, and says 1, not 0")
+
+	# The streak row: absent until asked for, then in the same plate.
+	_check(not v.has_streak_row(), "no streak row until show_streak")
+	var without := v.footprint().size.y
+	v.show_streak(3, 10)
+	_check(v.has_streak_row() and v.streak_text() == "Killstreak x3", "show_streak says its count")
+	_check(v.footprint().size.y > without, "the streak row grows the plate, not a second widget")
+	_close(v.shown_streak_fraction(), 0.3, "the first streak is drawn at once")
+	v.show_streak(6, 10)
+	v.advance(0.016)
+	_check(v.shown_streak_fraction() > 0.3 and v.shown_streak_fraction() < 0.6, "a rising streak eases")
+	v.advance(5.0)
+	_close(v.shown_streak_fraction(), 0.6, "and arrives")
+	v.streak_format = "Streak %d"
+	_check(v.streak_text() == "Streak 6", "the words are the game's to set")
+	v.show_streak(0, 0)
+	_check(not v.has_streak_row(), "a full of 0 hides the row")
 
 	v.show_vitals(100.0, 100.0)
 	v.advance(10.0)

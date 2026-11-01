@@ -24,6 +24,11 @@ extends DotHudPiece
 @export var bar_end: float = 300.0
 @export var bar_height: float = 16.0
 @export var armour_height: float = 7.0
+## One slim pill for health (no ticks or sheen) with armour a thinner bar under it. Off draws
+## the older thick bar at [member bar_height]; set [member fill_colour] to green to match.
+@export var slim: bool = true
+@export var slim_height: float = 8.0
+@export var slim_armour_height: float = 4.0
 @export_range(0.0, 1.0, 0.01) var low_fraction: float = 0.25
 ## Seconds the bar takes to close most of a gap. 0 jumps.
 @export_range(0.0, 2.0, 0.01) var ease_sec: float = 0.18
@@ -34,9 +39,9 @@ extends DotHudPiece
 @export var streak_format: String = "Killstreak x%d"
 ## Drawn in the streak row's icon slot (tinted gold). Null draws a drawn flame.
 @export var streak_icon: Texture2D
-@export var fill_colour: Color = Color(0.36, 0.86, 0.48)
+@export var fill_colour: Color = Color(0.4, 0.66, 1.0)
 @export var bonus_colour: Color = Color(0.92, 0.92, 0.92, 0.85)
-@export var armour_colour: Color = Color(0.4, 0.66, 1.0)
+@export var armour_colour: Color = Color(0.98, 0.7, 0.28)
 
 var health: float = 100.0
 var max_health: float = 100.0
@@ -195,14 +200,23 @@ func _pill(rect: Rect2, c: Color, edge: Color = Color(0, 0, 0, 0)) -> void:
 	draw_style_box(box, rect)
 
 
+func _bar_h() -> float:
+	return slim_height if slim else bar_height
+
+
+func _armour_h() -> float:
+	return slim_armour_height if slim else armour_height
+
+
 func _draw() -> void:
 	var low := is_low()
 	var text_c := colour(&"text")
 	var low_c := colour(&"low")
 	ink_plate(_plate(), Color(0, 0, 0, -1), 12)
 	var width := bar_end - bar_start
-	var top := 14.0
-	var mid := top + bar_height * 0.5
+	var bh := _bar_h()
+	var top := 18.0 if slim else 14.0
+	var mid := top + bh * 0.5
 	if show_cross:
 		# A cross on a round badge, drawn: no art to go missing.
 		var c := Vector2(bar_start - 18.0, mid)
@@ -210,30 +224,30 @@ func _draw() -> void:
 		draw_circle(c, 11.0, Color(0, 0, 0, 0.45))
 		draw_rect(Rect2(c - Vector2(2.0, 6.0), Vector2(4.0, 12.0)), mark)
 		draw_rect(Rect2(c - Vector2(6.0, 2.0), Vector2(12.0, 4.0)), mark)
-	var track := Rect2(bar_start, top, width, bar_height)
+	var track := Rect2(bar_start, top, width, bh)
 	_pill(track, Color(0.0, 0.0, 0.0, 0.55), Color(1, 1, 1, 0.14))
 	var fill := (width - 2.0) * _shown
 	var body := low_c if low else fill_colour
-	_pill(Rect2(bar_start + 1.0, top + 1.0, fill, bar_height - 2.0), body)
+	_pill(Rect2(bar_start + 1.0, top + 1.0, fill, bh - 2.0), body)
 	if bonus > 0.0:
 		var extra := minf((width - 2.0) * clampf(bonus / max_health, 0.0, 1.0), width - 2.0 - fill)
 		if extra > 1.0:
-			_pill(Rect2(bar_start + 1.0 + fill, top + 1.0, extra, bar_height - 2.0), bonus_colour)
-	if fill > 6.0:
+			_pill(Rect2(bar_start + 1.0 + fill, top + 1.0, extra, bh - 2.0), bonus_colour)
+	if fill > 6.0 and not slim:
 		# A sheen along the upper half, so the bar reads as a bar and not as a stripe of paint.
-		_pill(Rect2(bar_start + 4.0, top + 3.0, maxf(fill - 6.0, 0.0), bar_height * 0.28), Color(1, 1, 1, 0.22))
-	for q in 3:
+		_pill(Rect2(bar_start + 4.0, top + 3.0, maxf(fill - 6.0, 0.0), bh * 0.28), Color(1, 1, 1, 0.22))
+	for q in (0 if slim else 3):
 		var x := bar_start + width * 0.25 * (q + 1)
-		draw_line(Vector2(x, top + 3.0), Vector2(x, top + bar_height - 3.0), Color(0, 0, 0, 0.4), 1.0)
+		draw_line(Vector2(x, top + 3.0), Vector2(x, top + bh - 3.0), Color(0, 0, 0, 0.4), 1.0)
 	ink_text(Vector2(bar_end + 10.0, 40.0), number_text(), 30, low_c if low or status != "" else text_c)
-	var next_y := top + bar_height + 6.0
+	var next_y := top + bh + 6.0
 	if armour > 0.0:
-		_pill(Rect2(bar_start, next_y, width, armour_height), Color(0.0, 0.0, 0.0, 0.45))
-		_pill(Rect2(bar_start + 1.0, next_y + 1.0, (width - 2.0) * _shown_armour, armour_height - 2.0), armour_colour)
+		_pill(Rect2(bar_start, next_y, width, _armour_h()), Color(0.0, 0.0, 0.0, 0.45))
+		_pill(Rect2(bar_start + 1.0, next_y + 1.0, (width - 2.0) * _shown_armour, _armour_h() - 2.0), armour_colour)
 		# Toward the text's own lightness: a pale blue on a light theme's plate was not there at all.
 		var tone := armour_colour.lightened(0.3) if text_c.get_luminance() >= 0.5 else armour_colour.darkened(0.35)
 		ink_text(Vector2(bar_end + 10.0, 62.0), str(int(ceilf(armour))), 16, tone, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 4)
-		next_y += armour_height + 8.0
+		next_y += _armour_h() + 8.0
 	if streak_full > 0:
 		_draw_streak(next_y + 2.0, width)
 

@@ -232,6 +232,13 @@ func _build_pieces(kind: String) -> void:
 	_place(hud, vitals, Control.PRESET_BOTTOM_LEFT, Rect2(0.0, -84.0, 380.0, 76.0))
 	# Under the 0.25 threshold, with armour: the low colour is the state worth seeing.
 	vitals.show_vitals(18.0, 100.0, 45.0, 100.0)
+	# The same piece at full health, and at 89 with 89 armour: two bars that agree must still read as two things.
+	var full := DotVitals.new()
+	_place(hud, full, Control.PRESET_BOTTOM_LEFT, Rect2(0.0, -160.0, 380.0, 60.0))
+	full.show_vitals(100.0, 100.0)
+	var both := DotVitals.new()
+	_place(hud, both, Control.PRESET_BOTTOM_LEFT, Rect2(0.0, -250.0, 380.0, 76.0))
+	both.show_vitals(89.0, 100.0, 89.0, 100.0)
 
 	var ammo := DotAmmoCounter.new()
 	_place(hud, ammo, Control.PRESET_BOTTOM_RIGHT, Rect2(-300.0, -84.0, 290.0, 70.0))

@@ -94,6 +94,14 @@ var aim_source: Callable = Callable()
 ## How much of the crosshair is drawn now, 0..1, after the fade.
 var aim_opacity: float = 1.0
 
+## 0..1: a ring that fills round the crosshair (a hold: the pickup key over the weapon in hand). 0 draws nothing.
+var hold_progress: float = 0.0:
+	set(v):
+		v = clampf(v, 0.0, 1.0) if is_finite(v) else 0.0
+		if v != hold_progress:
+			hold_progress = v
+			queue_redraw()
+
 var _aim: float = 0.0
 var _alive: bool = true
 var _spread_degrees: float = 0.0
@@ -260,6 +268,11 @@ func _draw() -> void:
 			thickness
 		)
 
+	if hold_progress > 0.0:
+		var ring := gap + length + 7.0
+		draw_arc(centre, ring, 0.0, TAU, 48, edge, thickness + 3.0, true)
+		draw_arc(centre, ring, -PI * 0.5, -PI * 0.5 + TAU * hold_progress, 48, tint, thickness + 1.0, true)
+
 	if not centre_dot:
 		return
 
@@ -277,4 +290,5 @@ func describe() -> Dictionary:
 	out["alive"] = _alive
 	out["aim"] = _aim
 	out["aim_opacity"] = aim_opacity
+	out["hold_progress"] = hold_progress
 	return out

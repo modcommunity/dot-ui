@@ -35,5 +35,6 @@ extends RefCounted
 # 15: DotCrosshair eases a closing gap: close_sec, ease_spread(), spread_shown(); cl_crosshair_ease.
 # 16: DotUiForm.set_only_modified(), only_modified(): the Modified chip beside search.
 # 17: DotVitals hosts the killstreak: show_streak(), streak_format, streak_icon, has_streak_row().
-const LEVEL := 17
+# 18: DotCrosshair.hold_progress, a ring round the crosshair that fills during a hold.
+const LEVEL := 18
 const OLDEST := 1

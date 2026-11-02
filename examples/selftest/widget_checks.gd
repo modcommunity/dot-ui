@@ -20,6 +20,12 @@ func _crosshair_alive_checks() -> void:
 	c.hide_when_dead = false
 	_check(c.is_shown(), "hide_when_dead = false opts out")
 	_check(c.describe().get("alive") == false, "describe reports alive")
+	c.hold_progress = 2.0
+	_close(c.hold_progress, 1.0, "hold_progress is clamped to 1")
+	c.hold_progress = -1.0
+	_close(c.hold_progress, 0.0, "and to 0")
+	c.hold_progress = 0.5
+	_close(float(c.describe().get("hold_progress", -1.0)), 0.5, "describe reports hold_progress")
 	remove_child(c)
 	c.free()
 

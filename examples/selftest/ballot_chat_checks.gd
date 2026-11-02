@@ -81,6 +81,10 @@ func _test_ballot_panel() -> void:
 	panel.show_state(_ballot_state("both", {}))
 	_check(panel.avatar_position("u1") == Vector2(-1, -1), "a voter the server no longer has leaves the board")
 
+	_test_ballot_pointer(panel, picked)
+
+
+func _test_ballot_pointer(panel: DotBallotPanel, picked: Array) -> void:
 	# Pointer mode.
 	var mouse_before := Input.mouse_mode
 	panel._input(_key(panel.pointer_key))
@@ -287,38 +291,7 @@ func _test_ballot_avatar_rows() -> void:
 	_check(panel.choice_of("u9") == 2, "and once the server has confirmed the click, its next word is the vote (row %d)" % (panel.choice_of("u9") + 1))
 	panel.dismiss()
 
-	# 4. A new ballot over an old one: nothing carries over.
-	panel.show_state(_game_ballot({}))
-	panel.choose(5)
-	panel.show_state(_game_ballot({}, ["smash", "arena", "__keep__"]))
-	_frames(panel, 30)
-	_check(
-		panel.choice_of("u9") == -1 and panel.avatar_position("u9") == Vector2(-1, -1),
-		"a new ballot does not inherit the last one's click (row %d)" % (panel.choice_of("u9") + 1)
-	)
-	panel.dismiss()
-
-	# 5. The same options in another order: the vote follows the option, not the number.
-	panel.show_state(_game_ballot({}))
-	panel.choose(4)
-	panel.show_state(_game_ballot({"u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
-	_frames(panel, 60)
-	_check(
-		str(panel._options[panel.choice_of("u9")]["id"]) == "arena" and _row_drawn(panel, "u9") == panel.choice_of("u9"),
-		"reordered options keep the voter on the option they chose, avatar and mark together (row %d, drawn on %d)"
-			% [panel.choice_of("u9") + 1, _row_drawn(panel, "u9") + 1]
-	)
-
-	# 6. Votes changing under everybody: every avatar settles on its own voter's row.
-	panel.show_state(_game_ballot({"u1": 0, "u2": 5, "u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
-	_frames(panel, 10)
-	panel.show_state(_game_ballot({"u1": 3, "u2": 1, "u9": 5}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
-	_frames(panel, 90)
-	_check(
-		_row_drawn(panel, "u1") == 3 and _row_drawn(panel, "u2") == 1 and _row_drawn(panel, "u9") == 5,
-		"changed votes settle every avatar on its voter's new row (%d, %d, %d)"
-			% [_row_drawn(panel, "u1") + 1, _row_drawn(panel, "u2") + 1, _row_drawn(panel, "u9") + 1]
-	)
+	_ballot_avatar_rows_late(panel)
 
 	panel.queue_free()
 	_done()
@@ -338,24 +311,7 @@ func _test_chat_window() -> void:
 	]
 	add_child(window)
 
-	_check(
-		DotInputBinding.describe_action(&"probe_chat_open") == "Y",
-		"the box registers its open key at Y when the project has no action for it"
-	)
-	_check(
-		DotInputBinding.describe_action(&"probe_chat_team") == "U",
-		"and team chat at U"
-	)
-	_check(window.channel() == &"all", "it starts on the first channel")
-	_check(not window.is_open(), "and closed")
-	_check(
-		window.entry() != null and not window.entry().visible,
-		"with nothing to type in until it is opened"
-	)
-	_check(
-		window.entry().max_length == window.max_length,
-		"the line carries the length limit the server will also enforce"
-	)
+	_chat_window_defaults(window)
 
 	var opened_on: Array[StringName] = []
 	# A one-element array, not an int: a lambda captures a primitive BY VALUE, so
@@ -395,6 +351,34 @@ func _test_chat_window() -> void:
 		"once closed, the log expires again"
 	)
 
+	_chat_window_input(window, said)
+
+	_chat_window_selfmute(window, said)
+
+	_chat_window_channels(window)
+
+	_chat_window_wrap()
+
+	_chat_window_history()
+
+	var state := window.describe()
+	_check(
+		str(state.get("open_binding", "")) == "Y",
+		"describe() reports the key, which is what a bug report needs"
+	)
+
+	var bold_before := DotHudPiece.bold_font()
+	DotHudPiece.clear_cache()
+	_check(DotHudPiece._fonts.is_empty(), "clear_cache() empties the shared fonts")
+	_check(DotHudPiece.bold_font() != null and DotHudPiece._fonts.size() == 1 and bold_before != null, "and a font refills it")
+
+	window.queue_free()
+	InputMap.erase_action(&"probe_chat_open")
+	InputMap.erase_action(&"probe_chat_team")
+	_done()
+
+
+func _chat_window_input(window: DotChatWindow, said: Array[Dictionary]) -> void:
 	# An empty line is how a player abandons one, and it must not reach the server.
 	window.open()
 	window.entry().text = "   "
@@ -426,6 +410,8 @@ func _test_chat_window() -> void:
 	_check(window.entry().text == "", "and down comes back to an empty line")
 	window.close()
 
+
+func _chat_window_selfmute(window: DotChatWindow, said: Array[Dictionary]) -> void:
 	# `!sm` / `/sm`, the player's own block list: run here and never emitted, so it cannot
 	# reach the server and nobody is told. A stand-in for dot-chat's DotChatSelfMute, which
 	# dot-ui does not link.
@@ -452,6 +438,8 @@ func _test_chat_window() -> void:
 	window.self_mute = null
 	window.self_mute_enabled = false
 
+
+func _chat_window_channels(window: DotChatWindow) -> void:
 	# Channels.
 	var changed: Array[StringName] = []
 	window.channel_changed.connect(func(c: StringName) -> void: changed.append(c))
@@ -468,7 +456,6 @@ func _test_chat_window() -> void:
 	)
 	window.close()
 
-	opened_on.clear()
 	window.open(&"team")
 	_check(window.channel() == &"team", "and opening on one it does have moves there")
 	window.close()
@@ -490,6 +477,8 @@ func _test_chat_window() -> void:
 	window.enabled = false
 	_check(not window.is_open(), "turning it off while it is open closes it")
 
+
+func _chat_window_wrap() -> void:
 	# A line added before the node is readied must be kept: the log is built on demand.
 	var early := DotChatWindow.new()
 	early.register_actions = false
@@ -541,6 +530,8 @@ func _test_chat_window() -> void:
 
 	early.queue_free()
 
+
+func _chat_window_history() -> void:
 	# [b]What faded is still there to read.[/b] A closed log is a glance and lets go of a
 	# line after ten seconds; a player who opens the box to find what somebody said a
 	# minute ago was finding nothing.
@@ -606,19 +597,58 @@ func _test_chat_window() -> void:
 	_check(past.outline_size > 0, "the log is outlined by default")
 	past.queue_free()
 
-	var state := window.describe()
+
+func _chat_window_defaults(window: DotChatWindow) -> void:
 	_check(
-		str(state.get("open_binding", "")) == "Y",
-		"describe() reports the key, which is what a bug report needs"
+		DotInputBinding.describe_action(&"probe_chat_open") == "Y",
+		"the box registers its open key at Y when the project has no action for it"
+	)
+	_check(
+		DotInputBinding.describe_action(&"probe_chat_team") == "U",
+		"and team chat at U"
+	)
+	_check(window.channel() == &"all", "it starts on the first channel")
+	_check(not window.is_open(), "and closed")
+	_check(
+		window.entry() != null and not window.entry().visible,
+		"with nothing to type in until it is opened"
+	)
+	_check(
+		window.entry().max_length == window.max_length,
+		"the line carries the length limit the server will also enforce"
 	)
 
-	var bold_before := DotHudPiece.bold_font()
-	DotHudPiece.clear_cache()
-	_check(DotHudPiece._fonts.is_empty(), "clear_cache() empties the shared fonts")
-	_check(DotHudPiece.bold_font() != null and DotHudPiece._fonts.size() == 1 and bold_before != null, "and a font refills it")
 
-	window.queue_free()
-	InputMap.erase_action(&"probe_chat_open")
-	InputMap.erase_action(&"probe_chat_team")
-	_done()
+func _ballot_avatar_rows_late(panel: DotBallotPanel) -> void:
+	# 4. A new ballot over an old one: nothing carries over.
+	panel.show_state(_game_ballot({}))
+	panel.choose(5)
+	panel.show_state(_game_ballot({}, ["smash", "arena", "__keep__"]))
+	_frames(panel, 30)
+	_check(
+		panel.choice_of("u9") == -1 and panel.avatar_position("u9") == Vector2(-1, -1),
+		"a new ballot does not inherit the last one's click (row %d)" % (panel.choice_of("u9") + 1)
+	)
+	panel.dismiss()
 
+	# 5. The same options in another order: the vote follows the option, not the number.
+	panel.show_state(_game_ballot({}))
+	panel.choose(4)
+	panel.show_state(_game_ballot({"u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 60)
+	_check(
+		str(panel._options[panel.choice_of("u9")]["id"]) == "arena" and _row_drawn(panel, "u9") == panel.choice_of("u9"),
+		"reordered options keep the voter on the option they chose, avatar and mark together (row %d, drawn on %d)"
+			% [panel.choice_of("u9") + 1, _row_drawn(panel, "u9") + 1]
+	)
+
+	# 6. Votes changing under everybody: every avatar settles on its own voter's row.
+	panel.show_state(_game_ballot({"u1": 0, "u2": 5, "u9": 0}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 10)
+	panel.show_state(_game_ballot({"u1": 3, "u2": 1, "u9": 5}, ["arena", "wipeout", "zombie", "g2g", "deathrun", "__keep__"]))
+	_frames(panel, 90)
+	_check(
+		_row_drawn(panel, "u1") == 3 and _row_drawn(panel, "u2") == 1 and _row_drawn(panel, "u9") == 5,
+		"changed votes settle every avatar on its voter's new row (%d, %d, %d)"
+			% [_row_drawn(panel, "u1") + 1, _row_drawn(panel, "u2") + 1, _row_drawn(panel, "u9") + 1]
+	)

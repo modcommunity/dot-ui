@@ -132,10 +132,8 @@ func build(p_source: Object) -> DotResult:
 	_add_button(buttons, "Revert", func() -> void: panel.revert())
 	_add_button(buttons, "Back", close)
 
-	# The first control, by NAME rather than by `get_path()`: this runs before the screen
-	# is registered with a stack, so the node is not in the tree and `get_path()` pushes an
-	# error and returns nothing. game-arena's pause menu shipped exactly that and opened
-	# with nothing focused -- unusable with a gamepad, invisible with a mouse.
+	# The first control, by NAME, not `get_path()`: this runs before the screen is on a stack, so the node is not in the tree
+	# and `get_path()` pushes an error and returns nothing, leaving nothing focused.
 	initial_focus = NodePath("Panel/Column/Buttons/Apply")
 	return DotResult.success(self)
 

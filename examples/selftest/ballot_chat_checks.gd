@@ -541,8 +541,6 @@ func _test_chat_window() -> void:
 
 	early.queue_free()
 
-	# --- History ---------------------------------------------------------------
-
 	# [b]What faded is still there to read.[/b] A closed log is a glance and lets go of a
 	# line after ten seconds; a player who opens the box to find what somebody said a
 	# minute ago was finding nothing.

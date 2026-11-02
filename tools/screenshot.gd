@@ -116,6 +116,38 @@ func _build_hud() -> void:
 	_hud.config = DotUiConfig.new()
 	root.add_child(_hud)
 
+	_add_hud_bars()
+
+	var crosshair := DotCrosshair.new()
+	crosshair.name = "Crosshair"
+	crosshair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(crosshair)
+	crosshair.bind(func() -> float: return 0.04)
+	crosshair.refresh()
+
+	var feed := DotFeedView.new()
+	feed.name = "Feed"
+	feed.position = Vector2(880.0, 40.0)
+	feed.custom_minimum_size = Vector2(360.0, 160.0)
+	feed.size = feed.custom_minimum_size
+	_hud.add_child(feed)
+
+	# Names of the length a real one has, and one headshot, because the marker is the part
+	# a fixed-width fixture never exercises.
+	feed.add_kill(
+		"gamemann", Color(0.45, 0.75, 1.0), "rifle",
+		"a_very_long_display_name", Color(1.0, 0.55, 0.4), true
+	)
+	feed.add_kill(
+		"bo", Color(1.0, 0.55, 0.4), "grenade", "quiet_one", Color(0.45, 0.75, 1.0)
+	)
+	feed.add_kill("", Color.WHITE, "fell", "newcomer", Color(0.45, 0.75, 1.0))
+
+	_add_hud_chat()
+
+
+func _add_hud_bars() -> void:
 	# Health BELOW `low_fraction` and armour nearly full, because the low-value colour is
 	# the state worth looking at and it is the one a fixture picked at random will miss:
 	# the default threshold is 0.25, and a bar at 0.28 draws in the ordinary colour and
@@ -146,32 +178,8 @@ func _build_hud() -> void:
 	armour.bind(func() -> float: return 92.0)
 	armour.refresh()
 
-	var crosshair := DotCrosshair.new()
-	crosshair.name = "Crosshair"
-	crosshair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hud.add_child(crosshair)
-	crosshair.bind(func() -> float: return 0.04)
-	crosshair.refresh()
 
-	var feed := DotFeedView.new()
-	feed.name = "Feed"
-	feed.position = Vector2(880.0, 40.0)
-	feed.custom_minimum_size = Vector2(360.0, 160.0)
-	feed.size = feed.custom_minimum_size
-	_hud.add_child(feed)
-
-	# Names of the length a real one has, and one headshot, because the marker is the part
-	# a fixed-width fixture never exercises.
-	feed.add_kill(
-		"gamemann", Color(0.45, 0.75, 1.0), "rifle",
-		"a_very_long_display_name", Color(1.0, 0.55, 0.4), true
-	)
-	feed.add_kill(
-		"bo", Color(1.0, 0.55, 0.4), "grenade", "quiet_one", Color(0.45, 0.75, 1.0)
-	)
-	feed.add_kill("", Color.WHITE, "fell", "newcomer", Color(0.45, 0.75, 1.0))
-
+func _add_hud_chat() -> void:
 	# Moved up off the bottom-left corner, because that is where the chat box goes by
 	# default and the first picture of the two together was a stat bar drawn through a
 	# line of chat. Which is a real warning for a game, not only for this fixture: see

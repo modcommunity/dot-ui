@@ -117,6 +117,31 @@ func build(p_source: Object) -> DotResult:
 	heading.theme_type_variation = &"DotHeading"
 	column.add_child(heading)
 
+	_add_settings_scroll(column)
+
+	var bound := _rebind()
+
+	if not bound.ok:
+		return bound
+
+	var buttons := HBoxContainer.new()
+	buttons.name = "Buttons"
+	column.add_child(buttons)
+
+	_add_button(buttons, "Apply", apply)
+	_add_button(buttons, "Revert", func() -> void: panel.revert())
+	_add_button(buttons, "Back", close)
+
+	# The first control, by NAME rather than by `get_path()`: this runs before the screen
+	# is registered with a stack, so the node is not in the tree and `get_path()` pushes an
+	# error and returns nothing. game-arena's pause menu shipped exactly that and opened
+	# with nothing focused -- unusable with a gamepad, invisible with a mouse.
+	initial_focus = NodePath("Panel/Column/Buttons/Apply")
+	return DotResult.success(self)
+
+
+## The scrolling settings panel inside the column; fills `panel`.
+func _add_settings_scroll(column: VBoxContainer) -> void:
 	# A SCROLL CONTAINER, and it is not a nicety.
 	#
 	# A `DotSettingsPanel` is as tall as the document it was handed, and a document is as
@@ -147,26 +172,6 @@ func build(p_source: Object) -> DotResult:
 	# an editor, and an editor sized to its text is a column of ragged boxes.
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(panel)
-
-	var bound := _rebind()
-
-	if not bound.ok:
-		return bound
-
-	var buttons := HBoxContainer.new()
-	buttons.name = "Buttons"
-	column.add_child(buttons)
-
-	_add_button(buttons, "Apply", apply)
-	_add_button(buttons, "Revert", func() -> void: panel.revert())
-	_add_button(buttons, "Back", close)
-
-	# The first control, by NAME rather than by `get_path()`: this runs before the screen
-	# is registered with a stack, so the node is not in the tree and `get_path()` pushes an
-	# error and returns nothing. game-arena's pause menu shipped exactly that and opened
-	# with nothing focused -- unusable with a gamepad, invisible with a mouse.
-	initial_focus = NodePath("Panel/Column/Buttons/Apply")
-	return DotResult.success(self)
 
 
 ## Writes the panel's edits through to the source.

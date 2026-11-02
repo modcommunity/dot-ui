@@ -340,26 +340,8 @@ func _construct() -> void:
 	_sub.theme_type_variation = &"FormCaption"
 	head.add_child(_sub)
 
-	var search_bar := HBoxContainer.new()
-	search_bar.add_theme_constant_override("separation", tokens.sp(2))
+	var search_bar := _build_search_bar()
 	_shell.add_child(search_bar)
-	_search = LineEdit.new()
-	_search.placeholder_text = "Search settings"
-	_search.clear_button_enabled = true
-	_search.custom_minimum_size.y = tokens.target()
-	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_search.text_changed.connect(set_filter)
-	_search.gui_input.connect(_on_search_input)
-	search_bar.add_child(_search)
-	_modified_chip = Button.new()
-	_modified_chip.theme_type_variation = &"FormChip"
-	_modified_chip.toggle_mode = true
-	_modified_chip.text = "Modified"
-	_modified_chip.tooltip_text = "Only settings that differ from their default"
-	_modified_chip.custom_minimum_size.y = tokens.target()
-	_modified_chip.set_pressed_no_signal(_only_modified)
-	_modified_chip.toggled.connect(set_only_modified)
-	search_bar.add_child(_modified_chip)
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -382,6 +364,29 @@ func _construct() -> void:
 	if _filter != "" or _only_modified:
 		set_filter(_filter)
 
+
+## The search box and the Modified chip, in a row.
+func _build_search_bar() -> HBoxContainer:
+	var search_bar := HBoxContainer.new()
+	search_bar.add_theme_constant_override("separation", tokens.sp(2))
+	_search = LineEdit.new()
+	_search.placeholder_text = "Search settings"
+	_search.clear_button_enabled = true
+	_search.custom_minimum_size.y = tokens.target()
+	_search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_search.text_changed.connect(set_filter)
+	_search.gui_input.connect(_on_search_input)
+	search_bar.add_child(_search)
+	_modified_chip = Button.new()
+	_modified_chip.theme_type_variation = &"FormChip"
+	_modified_chip.toggle_mode = true
+	_modified_chip.text = "Modified"
+	_modified_chip.tooltip_text = "Only settings that differ from their default"
+	_modified_chip.custom_minimum_size.y = tokens.target()
+	_modified_chip.set_pressed_no_signal(_only_modified)
+	_modified_chip.toggled.connect(set_only_modified)
+	search_bar.add_child(_modified_chip)
+	return search_bar
 
 ## One DotFormRow per schema field, in its group, plus the empty-state label.
 func _build_rows() -> void:

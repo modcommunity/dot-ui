@@ -1,7 +1,6 @@
 # size
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
 addons/dot_ui/hud/dot_chat_window.gd	1010
-addons/dot_ui/screens/dot_settings_screen.gd::build	88
 examples/ui_selftest.gd	2369
 examples/ui_selftest.gd::_test_ballot_avatar_rows	90
 examples/ui_selftest.gd::_test_ballot_panel	118
@@ -12,4 +11,3 @@ examples/ui_selftest.gd::_test_input_binding	133
 examples/ui_selftest.gd::_test_screen_stack	88
 examples/ui_selftest.gd::_test_settings_screen	190
 examples/ui_selftest.gd::_test_table	97
-tools/screenshot.gd::_build_hud	97

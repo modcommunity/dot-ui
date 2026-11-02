@@ -13,13 +13,13 @@ extends "selftest/ballot_chat_checks.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 461
+const CHECKS := 473
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 32
+const SECTIONS := 33
 
 
 func _ready() -> void:
@@ -58,6 +58,7 @@ func _run() -> void:
 	_test_hit_marker()
 	_test_damage_numbers()
 	_test_key_prompt_and_hints()
+	_test_icon_plate_and_status_lines()
 	_test_winner_reveal()
 	_test_icon_set()
 	_test_icon_style()
@@ -542,9 +543,6 @@ func _test_key_prompt_and_hints() -> void:
 	p.queue_free()
 	h.queue_free()
 	_done()
-
-
-# --- Fixtures --------------------------------------------------------------
 
 
 # --- Theme -----------------------------------------------------------------

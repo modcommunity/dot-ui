@@ -267,6 +267,8 @@ func _build_pieces(kind: String) -> void:
 	_place(hud, hints, Control.PRESET_CENTER_LEFT, Rect2(62.0, -128.0, 220.0, 120.0))
 	hints.show_hints([["Scoreboard", "Tab"], ["Vote", "F3"], ["Chat", "Y"], ["Throw", "Mouse back"]])
 
+	_build_plate_and_status(hud)
+
 	var prompt := DotKeyPrompt.new()
 	_place(hud, prompt, Control.PRESET_CENTER, Rect2(-330.0, 120.0, 300.0, 36.0))
 	prompt.show_prompt("Open door", "E")
@@ -335,6 +337,16 @@ func _build_cover_stand_in(hud: Control, frame: Vector2) -> void:
 	cover_label.text = "cover stand-in\n(dot_hud_cover)"
 	cover_label.position = Vector2(12.0, 8.0)
 	cover.add_child(cover_label)
+
+
+func _build_plate_and_status(hud: Control) -> void:
+	var icon_plate := DotWeaponIconPlate.new()
+	_place(hud, icon_plate, Control.PRESET_BOTTOM_RIGHT, Rect2(-460.0, -96.0, 150.0, 80.0))
+	icon_plate.show_icon(DotWeaponIcons.stock().texture_for(&"", &"rifle"), &"rifle")
+
+	var status := DotStatusLines.new()
+	_place(hud, status, Control.PRESET_TOP_LEFT, Rect2(24.0, 20.0, 300.0, 80.0))
+	status.show_lines(["Down, hold on for help", DotStatusLines.effect_text("Haste", 2, 12.0), {"text": "LAST LIFE", "colour": Color(1.0, 0.34, 0.3)}])
 
 
 func _place(hud: Control, piece: Control, preset: Control.LayoutPreset, rect: Rect2) -> void:

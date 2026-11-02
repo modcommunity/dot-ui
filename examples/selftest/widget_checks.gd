@@ -234,3 +234,34 @@ func _registered_ids_checks() -> void:
 		"registered_ids() is sorted by text (%s)" % [ids_listed],
 		"Array.sort() on StringNames orders by interning"
 	)
+
+
+func _test_icon_plate_and_status_lines() -> void:
+	_section("weapon icon plate and status lines")
+
+	var plate := _piece(DotWeaponIconPlate.new(), Rect2(0.0, 0.0, 400.0, 100.0)) as DotWeaponIconPlate
+	_check(not plate.footprint().has_area(), "no sprite draws nothing")
+	plate.show_icon(ImageTexture.create_from_image(Image.create(128, 32, false, Image.FORMAT_RGBA8)), &"rifle")
+	_close(plate.icon_size().y, 37.5, "a wide sprite is capped by max_width, keeping its aspect")
+	_check(is_equal_approx(plate.footprint().end.x, 400.0), "right-aligned to the control's edge")
+	plate.show_icon(ImageTexture.create_from_image(Image.create(32, 32, false, Image.FORMAT_RGBA8)))
+	_close(plate.icon_size().x, plate.icon_height, "a square sprite is icon_height wide")
+	plate.clear()
+	_check(not plate.footprint().has_area(), "clear() takes it down")
+
+	var lines := _piece(DotStatusLines.new(), Rect2(0.0, 0.0, 300.0, 200.0)) as DotStatusLines
+	lines.show_lines(["Down", {"text": "Haste x2  0:12", "colour": Color.RED}])
+	_check(lines.texts() == PackedStringArray(["Down", "Haste x2  0:12"]), "strings and dictionaries both give words")
+	_check(is_equal_approx(lines.footprint().size.y, 2.0 * lines.row_height), "a row per line")
+	lines.align_right = true
+	_check(is_equal_approx(lines.footprint().end.x, 300.0), "or to the right edge")
+	lines.max_lines = 1
+	lines.show_lines(["a", "b"])
+	_check(lines.texts().size() == 1, "max_lines drops the rest")
+	_check(DotStatusLines.effect_text("Haste", 2, 12.0) == "Haste x2  0:12", "a timed effect line")
+	_check(DotStatusLines.effect_text("Haste", 1, -1.0) == "Haste  this round", "an endless one")
+	lines.clear()
+	_check(not lines.footprint().has_area(), "clear() takes the lines down")
+	plate.queue_free()
+	lines.queue_free()
+	_done()

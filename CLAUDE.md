@@ -23,7 +23,7 @@ Also requires **dot-profile** (`DotProfileSet`, `DotProfile`, `DotProfileRuntime
 | Path | What |
 | --- | --- |
 | `addons/dot_ui/core/` | `DotScreen`, `DotScreenStack`, `DotUiTheme`, `DotInputBinding` |
-| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair` (`dynamic`, `set_spread`), `DotCrosshairCvars` (`cl_crosshair_*` client cvars, API 10), `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints` |
+| `addons/dot_ui/hud/` | `DotHud`, `DotHudWidget`, `DotStatBar`, `DotCrosshair` (`dynamic`, `set_spread`), `DotCrosshairCvars` (`cl_crosshair_*` client cvars, API 10), `DotFeedView`, `DotTableView`, `DotChatWindow`, `DotBallotPanel`, `DotStarfield`; the glance pieces on `DotHudPiece`: `DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints`, `DotWeaponIconPlate`, `DotStatusLines` |
 | `addons/dot_ui/icons/` | `DotIconSet` (icons by id or tag, per-profile overrides, flat), `DotWeaponIcons.stock()` (Jestan's CC0 sheet, `jestan/CREDITS.md`; API 12), `DotWeaponIconStyle` (a game's tag table, `cl_weapon_icons`, halo, menu card; API 13); [hud](docs/hud.md#weapon-icons) |
 | `addons/dot_ui/panels/` | `DotSettingsPanel`, `DotBindingsPanel` |
 | `addons/dot_ui/screens/` | `DotPauseScreen`, `DotSettingsScreen`, `DotScoreboardScreen`; `DotWinnerReveal`, the end-of-match winner and podium (its own layer, not a stack screen) |

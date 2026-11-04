@@ -44,6 +44,7 @@ func _test_crosshair() -> void:
 	var spread := [0.0]
 	crosshair.source = func() -> Variant: return spread[0]
 	add_child(crosshair)
+	crosshair.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	crosshair.size = Vector2(1920.0, 1080.0)
 
 	_close(crosshair.gap_pixels(), 4.0, "zero spread sits at the base gap")

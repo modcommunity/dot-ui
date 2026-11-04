@@ -21,6 +21,7 @@ static func weapon_schema() -> Array:
 		F.call("fire_rate", "float", 6.0, {"group": "Handling", "min": 0.5, "max": 20.0, "unit": "shots/s", "description": "Rounds leaving the barrel per second."}),
 		F.call("spread", "float", 1.2, {"group": "Handling", "min": 0.0, "max": 10.0, "unit": "deg", "description": "Cone of fire when standing still."}),
 		F.call("magazine", "int", 12, {"group": "Ammo", "min": 1, "max": 60, "unit": "rounds"}),
+		F.call("recoil", "vector2", Vector2(0.4, 1.2), {"group": "Handling", "min": -10.0, "max": 10.0, "description": "Kick per shot, sideways and up (degrees).", "visible_if": {"automatic": true}}),
 		F.call("reload_time", "float", 1.6, {"group": "Ammo", "min": 0.2, "max": 5.0, "unit": "s", "description": "Time from reload key to a full magazine."}),
 		F.call("reserve", "int", 96, {"group": "Ammo", "min": 0, "max": 999, "unit": "rounds", "slider": false}),
 		F.call("damage", "float", 24.0, {"group": "Damage", "min": 1.0, "max": 200.0, "unit": "hp", "description": "Per hit, before multipliers."}),
@@ -29,8 +30,10 @@ static func weapon_schema() -> Array:
 		F.call("falloff_end", "float", 60.0, {"group": "Damage/Falloff", "min": 0.0, "max": 200.0, "unit": "m"}),
 		F.call("falloff_floor", "float", 0.35, {"group": "Damage/Falloff", "min": 0.0, "max": 1.0, "description": "Share of damage kept at the far end."}),
 		F.call("pierces_armor", "bool", false, {"group": "Damage"}),
+		F.call("pierce_depth", "int", 1, {"group": "Damage", "min": 1, "max": 5, "unit": "walls", "visible_if": {"pierces_armor": true}}),
 		F.call("price", "int", 450, {"group": "Shop", "min": 0, "max": 100000, "unit": "coins", "slider": false}),
 		F.call("unlock_level", "int", 1, {"group": "Shop", "min": 1, "max": 50}),
+		F.call("muzzle_offset", "vector3", Vector3(0.0, 0.05, 0.4), {"group": "Advanced", "description": "Where shots leave the model, in metres."}),
 		F.call("extra", "dict", {"sound": "pistol_a"}, {"group": "Advanced", "description": "Pack-specific keys, as JSON."}),
 	]
 
@@ -107,6 +110,14 @@ func _stage(n: String) -> void:
 		await _frames(2)
 		form.focus_key("tags")
 		(form.row("tags")._item_rows()[1].get_child(2) as Control).grab_focus()
+		return
+	if n.contains("vectors"):
+		form.set_value("pierces_armor", true)
+		form.set_value("pierce_depth", 3)
+		form.set_value("muzzle_offset", Vector3(0.02, 0.1, 0.55))
+		form.row("recoil").type_component(1, "99")
+		await _frames(2)
+		form.focus_key("recoil")
 		return
 	if n.contains("modified"):
 		form.set_only_modified(true)

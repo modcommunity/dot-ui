@@ -13,13 +13,13 @@ extends "selftest/ballot_chat_checks.gd"
 ## screen stack has to keep in agreement, a settings panel that must never show a
 ## secret, and a rebinder that must never leave an action bound to nothing.
 
-const CHECKS := 473
+const CHECKS := 482
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 33
+const SECTIONS := 34
 
 
 func _ready() -> void:
@@ -58,6 +58,7 @@ func _run() -> void:
 	_test_hit_marker()
 	_test_damage_numbers()
 	_test_key_prompt_and_hints()
+	_test_touch_buttons()
 	_test_icon_plate_and_status_lines()
 	_test_winner_reveal()
 	_test_icon_set()
@@ -543,6 +544,49 @@ func _test_key_prompt_and_hints() -> void:
 	p.queue_free()
 	h.queue_free()
 	_done()
+
+
+func _test_touch_buttons() -> void:
+	_section("touch buttons")
+
+	DotPlatform.touch_override = 0
+	var b := _piece(DotTouchButtons.new(), Rect2(0.0, 0.0, 390.0, 844.0)) as DotTouchButtons
+	_check(not b.visible, "hidden where there is no touch screen")
+	DotPlatform.touch_override = 1
+	b.visible = true
+	b.set_buttons(DotTouchButtons.fps_stock())
+
+	var downs: Array[StringName] = []
+	var ups: Array[StringName] = []
+	b.button_down.connect(func(id: StringName) -> void: downs.append(id))
+	b.button_up.connect(func(id: StringName) -> void: ups.append(id))
+	var fire := b.centre_of(&"fire")
+	var jump := b.centre_of(&"jump")
+	_check(fire.x > 195.0 and fire.y > 422.0, "the fire button sits in the bottom-right quarter")
+	_check(Rect2(Vector2.ZERO, b.size).encloses(b.footprint()), "and every button is on the screen")
+	_check(b.contains_point(fire) and not b.contains_point(Vector2(40.0, 400.0)), "contains_point is true on a button and false on the stick side")
+
+	b._input(_touch_event(0, fire, true))
+	_check(downs == [&"fire"] and b.is_held(&"fire"), "a finger down on a button holds it")
+	b._input(_touch_event(1, jump, true))
+	_check(b.is_held(&"fire") and b.is_held(&"jump"), "a second finger holds a second button at once")
+	b._input(_touch_event(0, fire, false))
+	_check(ups == [&"fire"] and not b.is_held(&"fire") and b.is_held(&"jump"), "lifting one finger releases only its button")
+	b._input(_touch_event(2, fire + Vector2(b.radius_of(&"fire") * 1.1, 0.0), true))
+	_check(b.is_held(&"fire"), "a finger a little outside the circle still hits (slop)")
+	b.set_buttons(DotTouchButtons.fps_stock())
+	_check(not b.is_held(&"jump") and ups.size() == 3, "replacing the buttons releases whatever was held")
+	DotPlatform.touch_override = -1
+	b.queue_free()
+	_done()
+
+
+func _touch_event(index: int, pos: Vector2, pressed: bool) -> InputEventScreenTouch:
+	var e := InputEventScreenTouch.new()
+	e.index = index
+	e.position = pos
+	e.pressed = pressed
+	return e
 
 
 # --- Theme -----------------------------------------------------------------

@@ -36,5 +36,6 @@ extends RefCounted
 # 16: DotUiForm.set_only_modified(), only_modified(): the Modified chip beside search.
 # 17: DotVitals hosts the killstreak: show_streak(), streak_format, streak_icon, has_streak_row().
 # 18: DotCrosshair.hold_progress, a ring round the crosshair that fills during a hold.
-const LEVEL := 18
+# 19: DotTouchButtons, round on-screen buttons for touch (button_down/up, contains_point, fps_stock).
+const LEVEL := 19
 const OLDEST := 1

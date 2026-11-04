@@ -113,7 +113,7 @@ done
 godot --headless --path . res://examples/ui_selftest.tscn
 ```
 
-136 checks, all offline, nothing rendered. Exits non-zero on any failure.
+`ui_selftest` and `form_selftest` run all offline, nothing rendered. They exit non-zero on any failure.
 
 ## Art credit
 

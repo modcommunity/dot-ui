@@ -29,7 +29,7 @@ signal button_up(id: StringName)
 ## Multiplier for every button's size and offset.
 @export var button_scale: float = 1.0
 
-## Each: id, label, offset (from the bottom-right corner, towards the middle of the screen, px), radius px.
+## Each: id, label, offset (from the margin-inset corner, towards the middle of the screen, px), radius px.
 var _buttons: Array[Dictionary] = []
 
 ## Finger index -> button id.

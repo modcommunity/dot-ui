@@ -4,8 +4,8 @@ extends Node
 ##
 ## godot --headless --path . res://examples/form_selftest.tscn
 
-const CHECKS := 183
-const SECTIONS := 13
+const CHECKS := 215
+const SECTIONS := 15
 
 var _passed := 0
 var _failed := 0
@@ -32,6 +32,8 @@ func _run() -> void:
 	await _test_layout()
 	await _test_reorder()
 	await _test_keypad()
+	await _test_conditional()
+	await _test_vectors()
 	await _test_bad_input()
 	print("")
 	print("%d sections of %d, %d checks of %d, %d failed" % [_completed, SECTIONS, _passed + _failed, CHECKS, _failed])
@@ -200,7 +202,7 @@ func _test_search() -> void:
 	_section("search and filter")
 	await _fresh()
 	var all := form.visible_keys().size()
-	_check(all == 19, "everything shows by default (%d)" % all)
+	_check(all == 20, "everything shows by default (%d)" % all)
 	form.search_box().text_changed.emit("reload")
 	_check(form.visible_keys() == PackedStringArray(["reload_time"]), "matches the label")
 	form.set_filter("hp")
@@ -535,6 +537,76 @@ func _test_keypad_modes(edit: LineEdit, a: InputEvent) -> void:
 	sp.close(true)
 	sec.queue_free()
 	await get_tree().process_frame
+
+
+func _test_conditional() -> void:
+	_section("conditional rows")
+	await _fresh()
+	_check(not form.visible_keys().has("recoil") and not form.visible_keys().has("pierce_depth"), "rows whose visible_if fails start hidden")
+	form.set_value("automatic", true)
+	_check(form.visible_keys().has("recoil"), "flipping the bool they depend on shows the row")
+	_check(not form.visible_keys().has("pierce_depth"), "and leaves the others hidden")
+	form.set_value("automatic", false)
+	_check(not form.visible_keys().has("recoil"), "flipping it back hides it again")
+	form.set_value("pierces_armor", true)
+	form.set_value("pierce_depth", 3)
+	form.set_value("pierces_armor", false)
+	_check(form.values()["pierce_depth"] == 3 and form.changes().has("pierce_depth"), "a hidden row keeps its value and its change")
+	form.set_value("automatic", true)
+	form.row("recoil").type_component(0, "99")
+	_check(form.has_errors(), "an invalid shown row blocks apply")
+	form.set_value("automatic", false)
+	_check(not form.has_errors() and form.values()["recoil"] == Vector2(0.4, 1.2), "hiding it drops the invalid entry and keeps the last good value")
+	form.set_filter("recoil")
+	_check(form.visible_keys().is_empty(), "search does not show a row whose condition fails")
+	form.set_filter("")
+	var g := DotUiForm.new()
+	add_child(g)
+	var made := g.build([
+		DotProfileSet.field("mode", "string", "a", {"enum": ["a", "b", "c"]}),
+		DotProfileSet.field("x", "int", 1, {"group": "Only", "visible_if": {"mode": ["b", "c"]}}),
+		DotProfileSet.field("y", "int", 1, {"visible_if": func(v: Dictionary) -> bool: return v["mode"] == "c" and v["x"] > 0}),
+	])
+	await get_tree().process_frame
+	_check(made.ok and g.groups().size() == 2 and not g.groups()[1].visible, "a card whose rows are all hidden hides")
+	g.set_value("mode", "b")
+	_check(g.groups()[1].visible and g.visible_keys().has("x") and not g.visible_keys().has("y"), "a list of allowed values shows the row and its card")
+	g.set_value("mode", "c")
+	_check(g.visible_keys().has("y"), "a Callable condition gets the values")
+	g.revert()
+	_check(not g.visible_keys().has("x") and not g.visible_keys().has("y"), "revert re-evaluates the conditions")
+	_check(not g.build([DotProfileSet.field("p", "int", 1, {"visible_if": {"nope": 1}})]).ok, "visible_if naming no field is refused")
+	_check(not g.build([DotProfileSet.field("p", "int", 1, {"visible_if": {"p": 1}})]).ok, "visible_if naming itself is refused")
+	_check(not g.build([DotProfileSet.field("p", "int", 1, {"visible_if": "yes"})]).ok, "visible_if of another type is refused")
+	g.queue_free()
+	_done()
+
+
+func _test_vectors() -> void:
+	_section("vector fields")
+	await _fresh()
+	var r := form.row("muzzle_offset")
+	_check(r._vec.size() == 3 and form.row("recoil")._vec.size() == 2, "a vector2 gets two boxes and a vector3 three")
+	_check(r._vec[1].text == "0.05" and r.editor() == r._vec[0], "boxes show the components and the first takes focus")
+	_check(r.type_component(2, "1.5") == "" and form.values()["muzzle_offset"] == Vector3(0.0, 0.05, 1.5), "editing one component edits the vector")
+	_check(r.is_modified() and form.changes().has("muzzle_offset"), "and marks it changed")
+	_check(r.type_component(0, "abc") != "" and form.has_errors(), "a non-number is an inline error")
+	_check(form.values()["muzzle_offset"] == Vector3(0.0, 0.05, 1.5), "and keeps the last good value")
+	_check(r.type_component(0, "") == "Enter 3 numbers.", "an empty box asks for the numbers")
+	r.type_component(0, "2")
+	_check(not form.has_errors() and form.values()["muzzle_offset"].x == 2.0, "fixing it clears the error")
+	form.reset_key("muzzle_offset")
+	_check(form.values()["muzzle_offset"] == Vector3(0.0, 0.05, 0.4) and r._vec[2].text == "0.4", "reset restores the default and the boxes")
+	var d := {"type": "vector2", "min": -1.0, "max": 1.0}
+	_check(DotFormSchema.validate(d, Vector2(2, 0)).error.message == "X: must be at most 1.", "min and max apply per component")
+	_check(DotFormSchema.validate(d, [0.5, -1]).value == Vector2(0.5, -1.0), "an array of numbers is taken as a vector")
+	_check(not DotFormSchema.validate(d, Vector3.ZERO).ok and not DotFormSchema.validate(d, [1]).ok, "the wrong size or type is refused")
+	_check(DotFormSchema.parse_text(d, "0.5, 0.25").value == Vector2(0.5, 0.25), "text parses as comma-separated numbers")
+	_check(DotFormSchema.display(d, Vector2(1, 0.5)) == "1, 0.5", "and displays the same way")
+	form.set_value("recoil", Vector2(1, 2))
+	form.apply()
+	_check(not form.is_dirty() and form.values()["recoil"] == Vector2(1, 2), "apply makes a vector the baseline")
+	_done()
 
 
 func _test_bad_input() -> void:

@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Turns a profile schema (as [method DotProfileSet.field] builds it) into form fields and checks values against them.
 
-const TYPES: Array[String] = ["int", "float", "string", "bool", "list", "dict", "any", "color"]
+const TYPES: Array[String] = ["int", "float", "string", "bool", "list", "dict", "any", "color", "vector2", "vector3"]
 
 ## Slider only when both ends are known and the span is not enormous.
 const SLIDER_MAX_SPAN := 100000.0
@@ -37,8 +37,34 @@ static func normalize(schema: Array) -> DotResult:
 		d["slider"] = bool(d.get("slider", true)) and is_ranged(d)
 		if not d.has("step"):
 			d["step"] = 1.0 if type == "int" else _auto_step(d)
+		if d.has("visible_if") and not (d["visible_if"] is Dictionary or d["visible_if"] is Callable):
+			return DotResult.fail(DotError.CODE_INVALID, "Field '%s': visible_if must be a Dictionary or a Callable." % key)
 		out.append(d)
+	for d in out:
+		if d.has("visible_if") and d["visible_if"] is Dictionary:
+			for dep in d["visible_if"]:
+				if str(dep) == d["name"] or not seen.has(str(dep)):
+					return DotResult.fail(DotError.CODE_INVALID, "Field '%s': visible_if names '%s', which is not another field." % [d["name"], str(dep)])
 	return DotResult.success(out)
+
+
+## Whether a field's `visible_if` holds for [param values]: a Dictionary of key to value (or to an Array of allowed values), all of which must match, or a Callable taking the values.
+static func is_shown(d: Dictionary, values: Dictionary) -> bool:
+	var cond: Variant = d.get("visible_if")
+	if cond is Callable:
+		return bool((cond as Callable).call(values))
+	if cond is Dictionary:
+		for dep in cond:
+			var want: Variant = cond[dep]
+			var have: Variant = values.get(str(dep))
+			var hit: bool = (want as Array).any(func(w: Variant) -> bool: return DotValue.same(w, have)) if want is Array else DotValue.same(want, have)
+			if not hit:
+				return false
+	return true
+
+
+static func vector_size(type: String) -> int:
+	return 3 if type == "vector3" else 2
 
 
 static func prettify(key: String) -> String:
@@ -62,6 +88,10 @@ static func default_for(type: String) -> Variant:
 			return {}
 		"color":
 			return "#ffffff"
+		"vector2":
+			return Vector2.ZERO
+		"vector3":
+			return Vector3.ZERO
 	return null
 
 
@@ -130,6 +160,28 @@ static func validate(d: Dictionary, value: Variant) -> DotResult:
 				v = value
 			else:
 				return _bad("Use a colour like #ff8800.")
+		"vector2", "vector3":
+			var n := vector_size(type)
+			var parts: Array = []
+			if value is Vector2 and n == 2:
+				parts = [value.x, value.y]
+			elif value is Vector3 and n == 3:
+				parts = [value.x, value.y, value.z]
+			elif value is Array and (value as Array).size() == n:
+				parts = value
+			else:
+				return _bad("Enter %d numbers." % n)
+			var nums: Array[float] = []
+			for i in n:
+				if not (parts[i] is int or parts[i] is float):
+					return _bad("%s: enter a number." % "XYZ"[i])
+				var c := float(parts[i])
+				if d.has("min") and c < float(d["min"]) - 0.0000001:
+					return _bad("%s: must be at least %s." % ["XYZ"[i], fmt(float(d["min"]))])
+				if d.has("max") and c > float(d["max"]) + 0.0000001:
+					return _bad("%s: must be at most %s." % ["XYZ"[i], fmt(float(d["max"]))])
+				nums.append(c)
+			v = Vector2(nums[0], nums[1]) if n == 2 else Vector3(nums[0], nums[1], nums[2])
 		"list":
 			if not value is Array:
 				return _bad("Must be a list.")
@@ -172,6 +224,17 @@ static func parse_text(d: Dictionary, raw: String) -> DotResult:
 			if not t.begins_with("#"):
 				t = "#" + t
 			return validate(d, t)
+		"vector2", "vector3":
+			var bits := t.replace(",", " ").split(" ", false)
+			var want := vector_size(d["type"])
+			if bits.size() != want:
+				return _bad("Enter %d numbers." % want)
+			var comps := []
+			for i in want:
+				if not bits[i].is_valid_float():
+					return _bad("%s: enter a number." % "XYZ"[i])
+				comps.append(bits[i].to_float())
+			return validate(d, comps)
 		"dict", "any":
 			if t == "":
 				return validate(d, default_for(d["type"]))
@@ -191,6 +254,9 @@ static func display(d: Dictionary, value: Variant) -> String:
 			return fmt(float(value))
 		"color":
 			return ("#" + (value as Color).to_html(false)) if value is Color else str(value)
+		"vector2", "vector3":
+			var comps: Array = [value.x, value.y] if value is Vector2 else [value.x, value.y, value.z] if value is Vector3 else []
+			return ", ".join(comps.map(func(c: Variant) -> String: return fmt(float(c))))
 		"dict", "any":
 			return JSON.stringify(value)
 	return str(value)

@@ -37,6 +37,7 @@ var _toggle: DotFormToggle
 var _option: OptionButton
 var _picker: ColorPickerButton
 var _list: VBoxContainer
+var _vec: Array[LineEdit] = []
 var _syncing := false
 var _line: HBoxContainer
 var _right: VBoxContainer
@@ -143,6 +144,22 @@ func _build_editor(line: HBoxContainer) -> void:
 		_picker.color_changed.connect(_on_picker)
 		line.add_child(_picker)
 		_make_entry(line, "#rrggbb")
+	elif type == "vector2" or type == "vector3":
+		for i in DotFormSchema.vector_size(type):
+			var axis := Label.new()
+			axis.theme_type_variation = &"FormUnit"
+			axis.text = "XYZ"[i]
+			line.add_child(axis)
+			var e := LineEdit.new()
+			e.custom_minimum_size = Vector2(tokens.px(56.0), tokens.target())
+			e.size_flags_horizontal = expand
+			e.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			e.text_changed.connect(func(_t: String) -> void: _on_vec_text())
+			e.focus_exited.connect(_on_vec_blur)
+			e.text_submitted.connect(func(_t: String) -> void: _on_vec_blur())
+			_hook_keypad(e, true)
+			_vec.append(e)
+			line.add_child(e)
 	elif type == "list":
 		_list = VBoxContainer.new()
 		_list.size_flags_horizontal = expand
@@ -220,6 +237,8 @@ func show_value(v: Variant) -> void:
 	elif _picker != null:
 		_picker.color = _as_color(v)
 		_entry.text = DotFormSchema.display(field, v)
+	elif not _vec.is_empty():
+		_show_vec(v)
 	elif _list != null:
 		_rebuild_list(v as Array)
 	else:
@@ -293,6 +312,8 @@ func editor() -> Control:
 	for c in [_slider, _toggle, _option, _picker, _entry]:
 		if c != null:
 			return c
+	if not _vec.is_empty():
+		return _vec[0]
 	if _list != null and _list.get_child_count() > 0:
 		return _item_edit(_item_rows()[0]) if not _item_rows().is_empty() else null
 	return null
@@ -338,6 +359,44 @@ func _on_entry_text(text: String) -> void:
 func _on_entry_blur() -> void:
 	if _error == "" and _entry != null and not _syncing:
 		_entry.text = DotFormSchema.display(field, _value)
+
+
+## Types into one component box of a vector field; returns the resulting error.
+func type_component(index: int, text: String) -> String:
+	if index < 0 or index >= _vec.size():
+		return "no such component"
+	_vec[index].text = text
+	_on_vec_text()
+	return _error
+
+
+func _show_vec(v: Variant) -> void:
+	var shown := DotFormSchema.display(field, v).split(", ")
+	for i in _vec.size():
+		_vec[i].text = shown[i] if i < shown.size() else ""
+
+
+func _on_vec_text() -> void:
+	if _syncing:
+		return
+	var texts := PackedStringArray()
+	for e in _vec:
+		texts.append(e.text.strip_edges())
+	var r := DotFormSchema.parse_text(field, " ".join(texts))
+	if r.ok:
+		_value = r.value
+		_set_error("")
+	elif texts.has(""):
+		_set_error("Enter %d numbers." % _vec.size())
+	else:
+		_set_error(r.error.message)
+	_sync_default_state()
+	edited.emit(key, _value, _error)
+
+
+func _on_vec_blur() -> void:
+	if _error == "" and not _syncing and not _vec.is_empty():
+		_show_vec(_value)
 
 
 func _on_picker(c: Color) -> void:
@@ -546,7 +605,7 @@ func _set_error(message: String) -> void:
 	if changed and message != "":
 		_err.modulate.a = 0.0
 		tokens.go(self, _err, "modulate:a", 1.0, 0.18)
-	for e in [_entry]:
+	for e in [_entry] + _vec:
 		if e == null:
 			continue
 		if message != "":

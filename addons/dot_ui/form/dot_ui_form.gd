@@ -38,6 +38,7 @@ var _current := {}
 var _errors := {}
 var _filter := ""
 var _only_modified := false
+var _matched := {}
 var _dirty := false
 var _compact := false
 var _built_touch := false
@@ -305,6 +306,7 @@ func _construct() -> void:
 	_group_rows.clear()
 	_group_kids.clear()
 	_tops.clear()
+	_matched.clear()
 	for c in get_children():
 		remove_child(c)
 		c.queue_free()
@@ -359,6 +361,8 @@ func _construct() -> void:
 	_scroll.add_child(_content)
 
 	_build_rows()
+	for g in _tops:
+		_regroup(g)
 	outer.add_child(_build_footer())
 	_apply_compact()
 	if _filter != "" or _only_modified:
@@ -403,6 +407,7 @@ func _build_rows() -> void:
 			if gamepad_entry:
 				open_keypad(edit, numeric))
 		_rows[f["name"]] = r
+		r.visible = DotFormSchema.is_shown(f, _current)
 		parent.add_row(r)
 		(_group_rows[parent] as Array).append(r)
 	_empty = Label.new()
@@ -477,12 +482,45 @@ func _filter_group(g: DotFormGroup) -> bool:
 	var shown := false
 	for r in _group_rows[g]:
 		var m := (r as DotFormRow).matches(_filter) and not (_only_modified and (r as DotFormRow).is_default() and not _errors.has((r as DotFormRow).key))
-		(r as DotFormRow).visible = m
-		shown = shown or m
+		_matched[(r as DotFormRow).key] = m
+		(r as DotFormRow).visible = m and _condition_holds((r as DotFormRow).key)
+		shown = shown or (r as DotFormRow).visible
 	for k in _group_kids[g]:
 		shown = _filter_group(k) or shown
 	g.visible = shown
 	g.set_forced(_filter != "" or _only_modified)
+	return shown
+
+
+func _condition_holds(key: String) -> bool:
+	return DotFormSchema.is_shown(_fields[key], _current)
+
+
+## Shows or hides the rows whose `visible_if` changed with the values; a row that hides drops its invalid entry.
+func _apply_conditions() -> void:
+	var moved := false
+	for key in _rows:
+		var r: DotFormRow = _rows[key]
+		var want: bool = _matched.get(key, true) and _condition_holds(key)
+		if want == r.visible:
+			continue
+		moved = true
+		r.visible = want
+		if not want and _errors.has(key):
+			r.show_value(_current[key])
+			_errors.erase(key)
+	if moved:
+		for g in _tops:
+			_regroup(g)
+
+
+func _regroup(g: DotFormGroup) -> bool:
+	var shown := false
+	for r in _group_rows[g]:
+		shown = shown or (r as DotFormRow).visible
+	for k in _group_kids[g]:
+		shown = _regroup(k) or shown
+	g.visible = shown
 	return shown
 
 
@@ -513,6 +551,7 @@ func _accept(key: String, value: Variant, error: String) -> void:
 
 
 func _refresh_state() -> void:
+	_apply_conditions()
 	var ch := changes()
 	for key in _rows:
 		(_rows[key] as DotFormRow).set_modified(ch.has(key) or _errors.has(key))

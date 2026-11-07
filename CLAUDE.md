@@ -34,7 +34,7 @@ Also requires **dot-profile** (`DotProfileSet`, `DotProfile`, `DotProfileRuntime
 
 ## Running and testing
 
-- Link `addons/dot_core` once ([development setup](../../docs/development-setup.md)), then the family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)) and `godot --headless --path . res://examples/ui_selftest.tscn`.
+- Link `addons/dot_core` once ([development setup](../../docs/development-setup.md)), then the family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything)) and `godot --headless --path . res://examples/ui_selftest.tscn`.
 - **Every visual change wants `tools/screenshot.sh` run and the frame looked at.** A headless viewport is 64 × 64, so no assertion can say anything about layout relative to the window; most of this addon's bugs were found by a picture. [testing](docs/testing.md#what-a-headless-suite-cannot-see)
 - Measure a size in a check, never a property. Pick fixtures that put a widget in the state its options exist for. [testing](docs/testing.md)
 

@@ -38,5 +38,6 @@ extends RefCounted
 # 18: DotCrosshair.hold_progress, a ring round the crosshair that fills during a hold.
 # 19: DotTouchButtons, round on-screen buttons for touch (button_down/up, contains_point, fps_stock).
 # 20: DotUiForm conditional rows (`visible_if` in a schema) and vector2/vector3 fields (DotFormRow.type_component).
-const LEVEL := 20
+# 21: DotHitFeedback, the hit marker and damage numbers mounted and fed together (mount, confirm_hit).
+const LEVEL := 21
 const OLDEST := 1

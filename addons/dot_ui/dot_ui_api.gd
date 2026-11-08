@@ -39,5 +39,6 @@ extends RefCounted
 # 19: DotTouchButtons, round on-screen buttons for touch (button_down/up, contains_point, fps_stock).
 # 20: DotUiForm conditional rows (`visible_if` in a schema) and vector2/vector3 fields (DotFormRow.type_component).
 # 21: DotHitFeedback, the hit marker and damage numbers mounted and fed together (mount, confirm_hit).
-const LEVEL := 21
+# 22: DotHudElementCvars (cl_hud_show_<element>, cl_hud_scale; perf panel off by default).
+const LEVEL := 22
 const OLDEST := 1

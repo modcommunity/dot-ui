@@ -160,6 +160,28 @@ func _crosshair_cvar_checks(crosshair: DotCrosshair) -> void:
 	_check(crosshair.colour.is_equal_approx(Color.RED), "colour is read from hex")
 	var bad = (seen[&"cl_crosshair_size"] as Callable).call("x")
 	_check(bad is DotResult and not (bad as DotResult).ok, "a bad value is refused")
+	_hud_element_cvar_checks()
+
+
+func _hud_element_cvar_checks() -> void:
+	var cv := DotHudElementCvars.new()
+	var seen := {}
+	_check(cv.bind_console(_FakeLocal.new(seen)) and seen.has(&"cl_hud_show_perf") and seen.has(&"cl_hud_scale"), "every hud element cvar is registered")
+	var panel := Control.new()
+	var ammo := Control.new()
+	_check(cv.attach(&"perf", panel) and cv.attach(&"ammo", ammo), "stock ids attach")
+	_check(not cv.attach(&"bogus", ammo), "an unknown id is refused")
+	_check(not panel.visible and ammo.visible, "perf is off by default, ammo on")
+	(seen[&"cl_hud_show_perf"] as Callable).call("1")
+	_check(panel.visible, "the cvar shows the perf panel")
+	(seen[&"cl_hud_show_ammo"] as Callable).call("0")
+	_check(not ammo.visible, "the cvar hides ammo")
+	(seen[&"cl_hud_scale"] as Callable).call("9")
+	_close(cv.scale, 2.0, "scale is clamped")
+	var bad = (seen[&"cl_hud_show_wave"] as Callable).call("x")
+	_check(bad is DotResult and not (bad as DotResult).ok, "a bad value is refused")
+	panel.free()
+	ammo.free()
 
 
 class _FakeLocal:

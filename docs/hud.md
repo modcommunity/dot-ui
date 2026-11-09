@@ -103,7 +103,7 @@ An icon column (`"kind": &"icon"`, a `Texture2D` per row) puts an avatar beside 
 - `DotScoreStrip.clock_text` rounds up, so a clock never says 0:00 with time left; arena's own clock rounded down. The score plates are optional: seven games draw a clock alone.
 - `DotHitMarker` is flashed by the host from a hit the server confirmed, never the local prediction; a non-lethal hit does not turn a fresh kill marker white (pellets after the lethal one).
 - `DotDamageNumbers` projects a world point through the viewport's camera (or `camera`) every frame, so a number stays on the body as the view moves; `add_at` takes a point in its own space for a 2D game. Hits on one victim within `merge_sec` add up.
-- `DotWeaponIconPlate` (the carried weapon's sprite, right-aligned beside a `DotAmmoCounter`, shadowed, mipmapped) and `DotStatusLines` (stacked short text rows, `show_lines`, `effect_text` for "Haste x2  0:12") came from game-zombie-zone's and game-arena's own icon and status labels (2026-11-02); neither game uses them yet.
+- `DotWeaponIconPlate` (the carried weapon's sprite, right-aligned beside a `DotAmmoCounter`, shadowed, mipmapped) and `DotStatusLines` (stacked short text rows, `show_lines`, `effect_text` for "Haste x2  0:12") came from game-zombie-zone's and game-arena's own icon and status labels (2026-11-02); game-zombie-zone's HUD uses both (2026-11-09: its weapon plate and effect lines), game-arena still draws its own.
 - `DotKeyPrompt` and `DotKeyHints` take the key's name from the host (the player's binding as text), never a letter written into the game.
 
 ### Which pieces moved, and which stayed in game-arena

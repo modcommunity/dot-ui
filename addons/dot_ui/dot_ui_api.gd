@@ -40,5 +40,6 @@ extends RefCounted
 # 20: DotUiForm conditional rows (`visible_if` in a schema) and vector2/vector3 fields (DotFormRow.type_component).
 # 21: DotHitFeedback, the hit marker and damage numbers mounted and fed together (mount, confirm_hit).
 # 22: DotHudElementCvars (cl_hud_show_<element>, cl_hud_scale; perf panel off by default).
-const LEVEL := 22
+# 23: DotHealthTag, the pill health bar and name over another player's head (update, face).
+const LEVEL := 23
 const OLDEST := 1

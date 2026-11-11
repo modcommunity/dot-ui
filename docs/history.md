@@ -2,9 +2,9 @@
 
 Bugs worth recognising if they come back. Almost all were invisible to every assertion and found by a picture or by a game. The rule each left is in [screens.md](screens.md), [hud.md](hud.md) or [testing.md](testing.md).
 
-- **Every screen this addon hosted was 0 × 0 unless its host sized it.** `set_anchors_preset(PRESET_FULL_RECT)` leaves the offsets alone; `DotScreenStack` had two, `DotCrosshair`, `DotHud` and `DotTableView` one each. Found by game-playground, the first project to put a screen on a stack whose parent is a plain `Node`.
+- **Every screen this addon hosted was 0 × 0 unless its host sized it.** `set_anchors_preset(PRESET_FULL_RECT)` leaves the offsets alone; `DotScreenStack` had two, `DotCrosshair`, `DotHud` and `DotTableView` one each. Found by game-playlot, the first project to put a screen on a stack whose parent is a plain `Node`.
 - **Closed screens sat after open ones in sibling order**, so another child added under the stack would draw above every open screen. Found by the self-test asserting the top screen is the last sibling.
-- **The pause menu drew nothing at all.** Its id defaulted to the node name (`&"Pause"`), `push(&"pause")` reported "no such screen" non-fatally, and every structural check (size, focus path, buttons) passed against a screen that was registered but never shown, here and in game-playground. Found by the first screenshot.
+- **The pause menu drew nothing at all.** Its id defaulted to the node name (`&"Pause"`), `push(&"pause")` reported "no such screen" non-fatally, and every structural check (size, focus path, buttons) passed against a screen that was registered but never shown, here and in game-playlot. Found by the first screenshot.
 - **The settings panel grew past the bottom of the window**, taking Apply, Revert and Back with it. Found by the same screenshot; three assertions written for it could not fail.
 - **The chat box consumed every key in `_input`** and so could not be typed in; **its log was nought pixels wide** (`anchor_right` on a fresh `Control`); and **a line put in before `_ready` vanished**. All three found by a picture.
 - **`DotTableView`: an absent width collapsed the column to nothing**, so every scoreboard and server browser drew one column with the data correct and `describe()` agreeing.

@@ -113,9 +113,9 @@ Decided 2026-10-11 by grepping every game's HUD for its own version (`dot-ui-hud
 | Arena piece | Games that would use it | Decision | Why |
 | --- | --- | --- | --- |
 | `Vitals` (+ two `DotStatBar`s) | arena; game-zombie-zone (bar, borrowed health, DOWN/DEAD); mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun (a bare number `Label`, red under a quarter); mg-prop-hunt (number on its disc) | moved: `DotVitals` | seven games draw health, each its own way |
-| `AmmoCounter` | arena; game-zombie-zone (`"%d / ∞"` label); game-playground wants one (carries the weapon pack, shows no count) | moved: `DotAmmoCounter` | three games; the endless reserve is zombie-zone's |
+| `AmmoCounter` | arena; game-zombie-zone (`"%d / ∞"` label); game-playlot wants one (carries the weapon pack, shows no count) | moved: `DotAmmoCounter` | three games; the endless reserve is zombie-zone's |
 | `ScoreStrip` | arena (scores and clock); game-hide-n-seek, mg-prop-hunt, mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun, game-zombie-zone, game-hungario (a centred `"%d:%02d"` label) | moved: `DotScoreStrip`, plates optional | nine games draw a clock |
-| `HitMarker` | arena; wanted by game-playground, game-g2gfast (combat maps) and game-zombie-zone, which all fire the weapon pack and confirm no hit on screen | moved: `DotHitMarker` | three more shooters |
+| `HitMarker` | arena; wanted by game-playlot, game-g2gfast (combat maps) and game-zombie-zone, which all fire the weapon pack and confirm no hit on screen | moved: `DotHitMarker` | three more shooters |
 | `DamageNumbers` | arena; the same three | moved: `DotDamageNumbers`, plus `add_at` for 2D | same consumers as the marker |
 | `Prompt` | arena; game-hide-n-seek (door), mg-deathrun (trap), mg-look-at-me (`"[E] …"`), mg-prop-hunt (`"press %s"`), game-zombie-zone (kits) | moved: `DotKeyPrompt` | five games write the key into a sentence |
 | `KeyHints` | arena; game-zombie-zone's kit line | moved: `DotKeyHints` | the prompt's keycap, and a second game |

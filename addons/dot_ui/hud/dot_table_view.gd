@@ -190,7 +190,7 @@ func _make_cell(text: String, colour: Color, column: Dictionary) -> Label:
 	# What that means is that **every scoreboard and every server browser in this family
 	# has shown one column**: no kills, no deaths, no assists, no score, no ping, no mass,
 	# no player count. The data was right, the columns were in `describe()`, and the suite
-	# asserted both. A rendered frame of game-arena's scoreboard is what showed it, and
+	# asserted both. A rendered frame of game-fatal-contact's scoreboard is what showed it, and
 	# there is no assertion that could have: the cells exist, the rows exist, and the
 	# widths they were laid out at are a property of a frame nothing was drawing.
 	#

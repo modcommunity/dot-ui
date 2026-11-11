@@ -89,7 +89,7 @@ func _initialize() -> void:
 		# and a frame of it once showed the avatar a row short of the marked choice.
 		{"id": &"", "file": "ballot_result.png", "result": true},
 		# The glance pieces (DotVitals, DotAmmoCounter, DotScoreStrip, DotHitMarker,
-		# DotDamageNumbers, DotKeyPrompt, DotKeyHints) laid out the way game-arena lays them
+		# DotDamageNumbers, DotKeyPrompt, DotKeyHints) laid out the way game-fatal-contact lays them
 		# out, over a pale floor with a dark block, because pale ground is where the first
 		# arena HUD vanished. A cover stand-in down the right edge, where a client shell
 		# draws its ballots, sits over a right-hand hint column: that column must be dimmed.
@@ -212,7 +212,7 @@ func _add_hud_chat() -> void:
 	)
 
 
-## The glance pieces over a pale floor, the way game-arena places them. [param kind] is
+## The glance pieces over a pale floor, the way game-fatal-contact places them. [param kind] is
 ## "dark" (no theme: the defaults), "light" (DotUiTheme.light()) or "small" (fitted to
 ## 854x480).
 func _build_pieces(kind: String) -> void:

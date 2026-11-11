@@ -108,7 +108,7 @@ func _process(_delta: float) -> void:
 
 
 ## Where this piece draws, in its own space. Empty when it draws nothing. A host collects
-## every piece's to check that no two meet (game-arena's layout check does this at five
+## every piece's to check that no two meet (game-fatal-contact's layout check does this at five
 ## frame sizes), and the cover test reads it.
 func footprint() -> Rect2:
 	return Rect2()
@@ -150,7 +150,7 @@ static func cover_rects(control: Control) -> Array[Rect2]:
 
 
 ## [method cover_rects] merged into one: what a host that moves its own widgets out of the
-## way reads (game-arena's weapon slots tighten to end above it).
+## way reads (game-fatal-contact's weapon slots tighten to end above it).
 static func covered_rect(control: Control) -> Rect2:
 	var out := Rect2()
 	for rect in cover_rects(control):
@@ -213,7 +213,7 @@ func font(italic: bool = false) -> Font:
 ##
 ## [b]Not `has_theme_font`[/b], which is true for any name on any type as soon as a theme in
 ## the chain has a default font, and the engine's own theme always has one: every piece drew
-## in the regular-weight fallback and never in [method bold_font] (game-arena's glance HUD,
+## in the regular-weight fallback and never in [method bold_font] (game-fatal-contact's glance HUD,
 ## rendered after the move, 2026-10-11). A font set on the type is asked for by name instead.
 ## Private, so the API level does not move: a game sets the font through a theme.
 func _theme_font() -> Font:

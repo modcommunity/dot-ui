@@ -1560,7 +1560,7 @@ func _test_bindings() -> void:
 	# "sorted" was whatever order the names happened to be created in -- and unstable
 	# between builds, since it depends on which script interned each name first. It is the
 	# same trap that gave two peers two different wire ids for one message type in dot-net.
-	# A rendered frame of game-arena's rebinder is what showed it; nothing about the
+	# A rendered frame of game-fatal-contact's rebinder is what showed it; nothing about the
 	# CONTENTS of the array could.
 	InputMap.add_action("probe_zulu")
 	InputMap.add_action("probe_alpha")

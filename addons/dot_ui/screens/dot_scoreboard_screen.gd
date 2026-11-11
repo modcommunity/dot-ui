@@ -11,7 +11,7 @@ extends DotScreen
 ## game's too, defaulting to [method DotTableView.scoreboard_columns]; a column with
 ## `"kind": &"icon"` draws the row's value as a picture (an avatar).
 ##
-## [b]Transparent, and does not block input[/b], like game-arena's own: it is held down
+## [b]Transparent, and does not block input[/b], like game-fatal-contact's own: it is held down
 ## during a live game, so it must not stop the player moving or hide what they look at.
 ##
 ## [codeblock]

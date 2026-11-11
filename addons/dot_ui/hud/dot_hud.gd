@@ -74,7 +74,7 @@ func _ready() -> void:
 
 ## How much a HUD laid out for [param design] is scaled on a frame [param frame] pixels:
 ## 1 at [param design] and up, the short side's share of it below, never under
-## [param minimum]. game-arena found the need standalone at 854x480, where the challenge ran
+## [param minimum]. game-fatal-contact found the need standalone at 854x480, where the challenge ran
 ## over the scores and the ability bar over the health; a client shell draws on a 1280x720
 ## canvas stretched to its window, so this is the same answer the shell gives.
 static func fit_scale(frame: Vector2, design: Vector2 = Vector2(1280.0, 720.0), minimum: float = 0.5) -> float:

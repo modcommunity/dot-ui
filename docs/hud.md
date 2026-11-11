@@ -88,7 +88,7 @@ An icon column (`"kind": &"icon"`, a `Texture2D` per row) puts an avatar beside 
 
 ## The glance pieces
 
-`DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints`, `DotWeaponIconPlate` and `DotStatusLines`, all on `DotHudPiece`. They were game-arena's "glance" HUD (`game/arena_hud_glance.gd` and the feedback classes in `arena_hud.gd`, 2026-10-10), and moved here once more than one game drew its own version of each.
+`DotVitals`, `DotAmmoCounter`, `DotScoreStrip`, `DotHitMarker`, `DotDamageNumbers`, `DotKeyPrompt`, `DotKeyHints`, `DotWeaponIconPlate` and `DotStatusLines`, all on `DotHudPiece`. They were game-fatal-contact's "glance" HUD (`game/arena_hud_glance.gd` and the feedback classes in `arena_hud.gd`, 2026-10-10), and moved here once more than one game drew its own version of each.
 
 - **Values in, never a game object.** Each piece draws from what it is handed (`show_vitals`, `show_ammo`, `show_clock`, `flash`, `add`), so a suite drives one alone and a render tool puts one up with chosen numbers. The host reads its game once a frame.
 - **Readable over a pale map.** Bold text with an outline in the theme's `ink`, on a translucent `plate`. The first arena HUD drew thin regular-weight text straight over white tiles and the health, ammunition and key hints all but vanished.
@@ -103,10 +103,10 @@ An icon column (`"kind": &"icon"`, a `Texture2D` per row) puts an avatar beside 
 - `DotScoreStrip.clock_text` rounds up, so a clock never says 0:00 with time left; arena's own clock rounded down. The score plates are optional: seven games draw a clock alone.
 - `DotHitMarker` is flashed by the host from a hit the server confirmed, never the local prediction; a non-lethal hit does not turn a fresh kill marker white (pellets after the lethal one).
 - `DotDamageNumbers` projects a world point through the viewport's camera (or `camera`) every frame, so a number stays on the body as the view moves; `add_at` takes a point in its own space for a 2D game. Hits on one victim within `merge_sec` add up.
-- `DotWeaponIconPlate` (the carried weapon's sprite, right-aligned beside a `DotAmmoCounter`, shadowed, mipmapped) and `DotStatusLines` (stacked short text rows, `show_lines`, `effect_text` for "Haste x2  0:12") came from game-zombie-zone's and game-arena's own icon and status labels (2026-11-02); game-zombie-zone's HUD uses both (2026-11-09: its weapon plate and effect lines), game-arena still draws its own.
+- `DotWeaponIconPlate` (the carried weapon's sprite, right-aligned beside a `DotAmmoCounter`, shadowed, mipmapped) and `DotStatusLines` (stacked short text rows, `show_lines`, `effect_text` for "Haste x2  0:12") came from game-zombie-zone's and game-fatal-contact's own icon and status labels (2026-11-02); game-zombie-zone's HUD uses both (2026-11-09: its weapon plate and effect lines), game-fatal-contact still draws its own.
 - `DotKeyPrompt` and `DotKeyHints` take the key's name from the host (the player's binding as text), never a letter written into the game.
 
-### Which pieces moved, and which stayed in game-arena
+### Which pieces moved, and which stayed in game-fatal-contact
 
 Decided 2026-10-11 by grepping every game's HUD for its own version (`dot-ui-hud-pieces-1`). "Draws its own" is a hand-rolled equivalent today; "wants" is a game with the need and nothing on screen.
 
@@ -115,7 +115,7 @@ Decided 2026-10-11 by grepping every game's HUD for its own version (`dot-ui-hud
 | `Vitals` (+ two `DotStatBar`s) | arena; game-zombie-zone (bar, borrowed health, DOWN/DEAD); mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun (a bare number `Label`, red under a quarter); mg-prop-hunt (number on its disc) | moved: `DotVitals` | seven games draw health, each its own way |
 | `AmmoCounter` | arena; game-zombie-zone (`"%d / ∞"` label); game-playlot wants one (carries the weapon pack, shows no count) | moved: `DotAmmoCounter` | three games; the endless reserve is zombie-zone's |
 | `ScoreStrip` | arena (scores and clock); game-hide-n-seek, mg-prop-hunt, mg-smash-copter, mg-buses-from-hell, mg-wipeout, mg-deathrun, game-zombie-zone, game-hungario (a centred `"%d:%02d"` label) | moved: `DotScoreStrip`, plates optional | nine games draw a clock |
-| `HitMarker` | arena; wanted by game-playlot, game-g2gfast (combat maps) and game-zombie-zone, which all fire the weapon pack and confirm no hit on screen | moved: `DotHitMarker` | three more shooters |
+| `HitMarker` | arena; wanted by game-playlot, game-airdrift (combat maps) and game-zombie-zone, which all fire the weapon pack and confirm no hit on screen | moved: `DotHitMarker` | three more shooters |
 | `DamageNumbers` | arena; the same three | moved: `DotDamageNumbers`, plus `add_at` for 2D | same consumers as the marker |
 | `Prompt` | arena; game-hide-n-seek (door), mg-deathrun (trap), mg-look-at-me (`"[E] …"`), mg-prop-hunt (`"press %s"`), game-zombie-zone (kits) | moved: `DotKeyPrompt` | five games write the key into a sentence |
 | `KeyHints` | arena; game-zombie-zone's kit line | moved: `DotKeyHints` | the prompt's keycap, and a second game |

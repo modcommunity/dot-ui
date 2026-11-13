@@ -95,6 +95,9 @@ var covered: bool = false
 
 static var _fonts: Dictionary = {}
 
+## [method _theme_font]'s last answer, held in a one-element array (empty: not asked since the theme chain changed).
+var _theme_font_known: Array = []
+
 
 func _init() -> void:
 	# A HUD piece never eats the click that should have fired the weapon.
@@ -119,7 +122,8 @@ func footprint() -> Rect2:
 ## ballots in opposite corners would cover everything between them.
 func refresh_cover() -> void:
 	covered = false
-	if cover_mode != CoverMode.IGNORE:
+	# No member of the group at all (the common frame): no footprint, no group walk.
+	if cover_mode != CoverMode.IGNORE and is_inside_tree() and get_tree().has_group(COVER_GROUP):
 		var mine := footprint()
 		if mine.has_area():
 			for rect in cover_rects(self):
@@ -217,6 +221,22 @@ func font(italic: bool = false) -> Font:
 ## rendered after the move, 2026-10-11). A font set on the type is asked for by name instead.
 ## Private, so the API level does not move: a game sets the font through a theme.
 func _theme_font() -> Font:
+	# Every draw asks, 17 times a frame across a HUD; the theme chain only changes with a
+	# theme-changed notification, which clears this.
+	if not _theme_font_known.is_empty():
+		return _theme_font_known[0]
+	var found := _theme_font_walk()
+	if is_inside_tree():
+		_theme_font_known = [found]
+	return found
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED or what == NOTIFICATION_ENTER_TREE or what == NOTIFICATION_PARENTED:
+		_theme_font_known = []
+
+
+func _theme_font_walk() -> Font:
 	var node: Node = self
 	while node != null:
 		var owned: Theme = null
